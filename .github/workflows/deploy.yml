@@ -5,7 +5,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - master # Đã thay đổi từ 'main' thành 'master'
+      - master # Đảm bảo đây là nhánh chính của bạn
 
 # Các công việc (jobs) mà workflow này sẽ thực hiện.
 jobs:
@@ -16,26 +16,21 @@ jobs:
 
     # Các bước (steps) trong job này.
     steps:
-      # Bước 1: Checkout mã nguồn từ repository.
-      # Đây là một action tiêu chuẩn để lấy code của bạn về môi trường GitHub Actions.
-      - name: Checkout 
-        uses: actions/checkout@v3
+      # Bước 1: Checkout mã nguồn từ repository. Đã cập nhật lên v4.
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # Bước 2: Cấu hình GitHub Pages.
-      # Bước này thiết lập môi trường để triển khai GitHub Pages.
+      # Bước 2: Cấu hình GitHub Pages. Đã cập nhật lên v3.
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
-      # Bước 3: Tải Artifact lên GitHub Pages.
-      # Artifact là các file mà bạn muốn triển khai (trong trường hợp này là index.html).
-      # 'path: .' có nghĩa là tải tất cả các file trong thư mục gốc của repository.
+      # Bước 3: Tải Artifact lên GitHub Pages. Đã cập nhật lên v3 (phiên bản mới nhất được khuyến nghị).
       - name: Upload Artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
           path: '.' # Đường dẫn tới thư mục chứa các file web tĩnh (index.html, css, js). Ở đây là thư mục gốc.
 
-      # Bước 4: Triển khai lên GitHub Pages.
-      # Đây là bước cuối cùng để đưa trang web của bạn lên trực tuyến.
+      # Bước 4: Triển khai lên GitHub Pages. Đã cập nhật lên v3.
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v3
