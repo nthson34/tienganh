@@ -205,14 +205,29 @@
               synthUtterance.rate = 0.8; // Set a slightly slower rate for better clarity for kids
               setUtterance(synthUtterance);
 
-              // Listen for voices to be loaded, ensures speech synthesis is ready
-              window.speechSynthesis.onvoiceschanged = () => {
+              // Event listener for when voices are loaded by the browser
+              const loadVoices = () => {
+                const voices = window.speechSynthesis.getVoices();
+                // Try to find a high-quality US English voice, prioritizing Google voices
+                const englishUSVoice = voices.find(
+                  voice => voice.lang === 'en-US' && (voice.name.includes('Google') || voice.name.includes('Samantha') || voice.name.includes('Alex'))
+                ) || voices.find(voice => voice.lang === 'en-US'); // Fallback to any en-US voice
+
+                if (englishUSVoice) {
+                  synthUtterance.voice = englishUSVoice;
+                  console.log('Using voice:', englishUSVoice.name); // Log the chosen voice
+                }
                 setIsSpeechReady(true);
               };
-              // If voices are already loaded (e.g., on subsequent renders), set it ready immediately
+
+              // Check if voices are already loaded
               if (window.speechSynthesis.getVoices().length > 0) {
-                setIsSpeechReady(true);
+                loadVoices();
+              } else {
+                // If not, wait for the 'voiceschanged' event
+                window.speechSynthesis.onvoiceschanged = loadVoices;
               }
+
             } else {
               console.warn('Trình duyệt này không hỗ trợ chức năng phát âm.');
             }
@@ -231,6 +246,7 @@
           // Function to pronounce the current English word
           const speakWord = () => {
             if (utterance && isSpeechReady && currentWord) {
+              window.speechSynthesis.cancel(); // Stop any ongoing speech
               utterance.text = currentWord.english;
               window.speechSynthesis.speak(utterance);
             } else {
