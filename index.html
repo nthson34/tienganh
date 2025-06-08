@@ -173,7 +173,7 @@
           // State to track if speech synthesis is ready
           const [isSpeechReady, setIsSpeechReady] = useState(false);
 
-          // State to manage current game mode: 'flashcard', 'visual_quiz', 'audio_quiz'
+          // State to manage current game mode: 'flashcard', 'visual_quiz', 'audio_quiz', 'fill_in_blanks'
           const [gameMode, setGameMode] = useState('flashcard');
 
           // States for Quiz/Game modes
@@ -181,6 +181,11 @@
           const [selectedAnswer, setSelectedAnswer] = useState(null); // Stores the answer selected by the user (null if not yet answered)
           const [score, setScore] = useState(0); // Tracks the number of correct answers
           const [totalQuestions, setTotalQuestions] = useState(0); // Tracks the total number of questions attempted
+
+          // States for Fill-in-the-blanks game
+          const [fillInBlanksInput, setFillInBlanksInput] = useState(''); // User's input for fill-in-the-blanks
+          const [blankedWord, setBlankedWord] = useState(''); // The word with missing letters
+          const [fillInBlanksCorrect, setFillInBlanksCorrect] = useState(null); // Null, true, or false for correctness
 
           // Get the current word object based on the currentShuffledIndex
           const currentWord = shuffledVocabulary[currentShuffledIndex];
@@ -234,14 +239,40 @@
             shuffleAndSetNewWord(); // Initial shuffle when component mounts
           }, []);
 
-          // Effect to generate options when the current word or game mode changes
+          // Function to generate the word with missing letters for fill-in-the-blanks game
+          const generateMissingLettersWord = (word) => {
+            if (word.length <= 2) return word; // Don't blank out very short words
+            const letters = word.split('');
+            const numToBlank = Math.max(1, Math.floor(letters.length / 3)); // Blank at least 1, up to 1/3 of letters
+
+            let blankedIndices = new Set();
+            // Ensure first and last letters are not blanked
+            const availableIndices = Array.from({ length: letters.length - 2 }, (_, i) => i + 1);
+
+            while (blankedIndices.size < numToBlank && availableIndices.length > 0) {
+                const randomIndex = Math.floor(Math.random() * availableIndices.length);
+                const indexToBlank = availableIndices.splice(randomIndex, 1)[0];
+                blankedIndices.add(indexToBlank);
+            }
+
+            return letters.map((char, index) =>
+                blankedIndices.has(index) ? '_' : char
+            ).join('');
+          };
+
+
+          // Effect to generate options (for quizzes) or blanked word (for fill-in-blanks)
           useEffect(() => {
             if (gameMode === 'visual_quiz' || gameMode === 'audio_quiz') {
               generateGameOptions();
+            } else if (gameMode === 'fill_in_blanks' && currentWord) {
+              setBlankedWord(generateMissingLettersWord(currentWord.english));
+              setFillInBlanksInput(''); // Clear input for new word
+              setFillInBlanksCorrect(null); // Reset correctness for new word
             }
             // Reset selected answer when word/mode changes to prepare for a new question
             setSelectedAnswer(null);
-          }, [currentShuffledIndex, gameMode, shuffledVocabulary]); // Added shuffledVocabulary as dependency
+          }, [currentShuffledIndex, gameMode, shuffledVocabulary]);
 
           // Function to pronounce the current English word
           const speakWord = () => {
@@ -281,7 +312,7 @@
             let options = [correctWord]; // Start with the correct answer
 
             // Filter out the correct word to pick distractors
-            const potentialDistractors = allEnglishWords.filter(word => word !== correctWord);
+            const potentialDistractors = allEnglishWords.filter(word => word.english.toLowerCase() !== correctWord.toLowerCase());
 
             // Randomly pick 2 distractors (or fewer if less than 3 unique words are available)
             while (options.length < 3 && potentialDistractors.length > 0) {
@@ -295,13 +326,31 @@
 
           // Function to handle answer click in quiz/game mode
           const handleAnswerClick = (answer) => {
-            if (selectedAnswer) return; // Prevent multiple clicks on options for the same question
+            if (selectedAnswer !== null) return; // Prevent multiple clicks on options for the same question
 
             setSelectedAnswer(answer); // Mark the selected answer
-            if (answer === currentWord.english) {
+            if (answer.toLowerCase() === currentWord.english.toLowerCase()) { // Case-insensitive comparison
               setScore(prevScore => prevScore + 1); // Increment score if correct
             }
             setTotalQuestions(prevTotal => prevTotal + 1); // Increment total questions attempted
+          };
+
+          // Handler for fill-in-the-blanks input changes
+          const handleFillInBlanksInput = (event) => {
+            setFillInBlanksInput(event.target.value);
+          };
+
+          // Handler for fill-in-the-blanks submission
+          const handleFillInBlanksSubmit = () => {
+            if (fillInBlanksCorrect !== null) return; // Prevent re-submission
+
+            if (fillInBlanksInput.toLowerCase() === currentWord.english.toLowerCase()) { // Case-insensitive comparison
+              setFillInBlanksCorrect(true);
+              setScore(prevScore => prevScore + 1);
+            } else {
+              setFillInBlanksCorrect(false);
+            }
+            setTotalQuestions(prevTotal => prevTotal + 1);
           };
 
           // Function to reset the current game mode
@@ -310,12 +359,18 @@
             setTotalQuestions(0);
             shuffleAndSetNewWord(); // Reshuffle and start from the beginning of a new random sequence
             setSelectedAnswer(null);
+            setFillInBlanksInput('');
+            setBlankedWord('');
+            setFillInBlanksCorrect(null);
           };
 
           // Function to move to the next question in game modes
           const nextGameQuestion = () => {
             nextWord(); // Move to the next word in the shuffled vocabulary
             setSelectedAnswer(null); // Reset selected answer to allow interaction for the new question
+            setFillInBlanksInput('');
+            setBlankedWord('');
+            setFillInBlanksCorrect(null);
           };
 
           // Function to change the current game mode
@@ -326,9 +381,12 @@
             setTotalQuestions(0);
             setCurrentShuffledIndex(0); // Go back to the first word/question of the current shuffled sequence
             setSelectedAnswer(null);
-            if (mode !== 'flashcard') { // Only generate options if entering a quiz/game mode
+            setFillInBlanksInput('');
+            setBlankedWord('');
+            setFillInBlanksCorrect(null);
+            if (mode !== 'flashcard') { // Only generate options/blanked word if entering a quiz/game mode
               shuffleAndSetNewWord(); // Reshuffle for a new game session
-              // generateGameOptions is called by useEffect based on currentShuffledIndex and gameMode
+              // generateGameOptions or setBlankedWord will be called by useEffect based on gameMode
             }
           };
 
@@ -367,6 +425,13 @@
                 >
                   Trò chơi Nghe & Chọn
                 </button>
+                <button
+                  onClick={() => changeGameMode('fill_in_blanks')}
+                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-lg sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
+                    ${gameMode === 'fill_in_blanks' ? 'bg-red-600 text-white ring-red-300' : 'bg-red-500 text-white hover:bg-red-600 ring-transparent'}`}
+                >
+                  Viết Từ Còn Thiếu
+                </button>
               </div>
 
               {/* Progress Bar */}
@@ -398,11 +463,11 @@
                             className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-md transition-all duration-200
                               ${selectedAnswer === null
                                 ? 'bg-blue-500 hover:bg-blue-600 text-white' // Default state
-                                : option === currentWord.english && option === selectedAnswer
+                                : option.toLowerCase() === currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
                                   ? 'bg-green-500 text-white' // Correct and selected
-                                  : option !== currentWord.english && option === selectedAnswer
+                                  : option.toLowerCase() !== currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
                                     ? 'bg-red-500 text-white' // Incorrect and selected
-                                    : option === currentWord.english && selectedAnswer !== null
+                                    : option.toLowerCase() === currentWord.english.toLowerCase() && selectedAnswer !== null
                                       ? 'bg-green-300 text-gray-800' // Correct but not selected (show hint after selection)
                                       : 'bg-gray-300 text-gray-600 cursor-not-allowed' // Other non-selected
                               }
@@ -416,10 +481,12 @@
 
                       {selectedAnswer && ( // Show feedback and next button only after an answer is selected
                         <div className="mt-4 text-center flex flex-col items-center">
-                          {selectedAnswer === currentWord.english ? (
+                          {selectedAnswer.toLowerCase() === currentWord.english.toLowerCase() ? (
                             <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
                           ) : (
-                            <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">Sai rồi! Hãy thử lại. 😅</p>
+                            <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                                Sai rồi! Đáp án đúng là: **{currentWord.english}** 😅
+                            </p>
                           )}
                           <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                             <button
@@ -490,11 +557,11 @@
                             className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-md transition-all duration-200
                               ${selectedAnswer === null
                                 ? 'bg-blue-500 hover:bg-blue-600 text-white' // Default state
-                                : option === currentWord.english && option === selectedAnswer
+                                : option.toLowerCase() === currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
                                   ? 'bg-green-500 text-white' // Correct and selected
-                                  : option !== currentWord.english && option === selectedAnswer
+                                  : option.toLowerCase() !== currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
                                     ? 'bg-red-500 text-white' // Incorrect and selected
-                                    : option === currentWord.english && selectedAnswer !== null
+                                    : option.toLowerCase() === currentWord.english.toLowerCase() && selectedAnswer !== null
                                       ? 'bg-green-300 text-gray-800' // Correct but not selected (show hint after selection)
                                       : 'bg-gray-300 text-gray-600 cursor-not-allowed' // Other non-selected
                               }
@@ -508,10 +575,12 @@
 
                       {selectedAnswer && ( // Show feedback and next button only after an aswer is selected
                         <div className="mt-4 text-center flex flex-col items-center">
-                          {selectedAnswer === currentWord.english ? (
+                          {selectedAnswer.toLowerCase() === currentWord.english.toLowerCase() ? (
                             <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
                           ) : (
-                            <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">Sai rồi! Hãy thử lại. 😅</p>
+                            <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                                Sai rồi! Đáp án đúng là: **{currentWord.english}** 😅
+                            </p>
                           )}
                           <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                             <button
@@ -540,6 +609,84 @@
                         className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-300"
                       >
                         Chơi lại Nghe & Chọn
+                      </button>
+                    </div>
+                  ) : gameMode === 'fill_in_blanks' ? (
+                    // Fill in the Blanks Mode UI
+                    <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105">
+                      <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                        Điền từ còn thiếu vào chỗ trống:
+                      </h2>
+
+                      {/* Vietnamese meaning */}
+                      <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 mb-4 select-none italic text-center px-2">
+                        "{currentWord.vietnamese}"
+                      </p>
+
+                      {/* Blanked word display */}
+                      <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-800 mb-6 tracking-wide text-center px-2">
+                        {blankedWord}
+                      </p>
+
+                      {/* Input field for user */}
+                      <input
+                        type="text"
+                        value={fillInBlanksInput}
+                        onChange={handleFillInBlanksInput}
+                        disabled={fillInBlanksCorrect !== null} // Disable input after check
+                        className="w-full max-w-xs md:max-w-sm lg:max-w-md px-4 py-3 mb-6 border-2 border-blue-400 rounded-lg text-xl md:text-2xl text-center focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="Nhập từ tiếng Anh..."
+                      />
+
+                      {/* Check Answer Button */}
+                      <button
+                        onClick={handleFillInBlanksSubmit}
+                        disabled={fillInBlanksCorrect !== null || fillInBlanksInput.trim() === ''} // Disable after check or if input is empty
+                        className={`px-8 py-4 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4 mb-6
+                          ${fillInBlanksCorrect === null
+                            ? 'bg-orange-500 hover:bg-orange-600 text-white ring-orange-300'
+                            : 'bg-gray-300 text-gray-600 cursor-not-allowed ring-transparent'
+                          }`}
+                      >
+                        Kiểm tra
+                      </button>
+
+                      {fillInBlanksCorrect !== null && ( // Show feedback and next/listen buttons
+                        <div className="mt-4 text-center flex flex-col items-center">
+                          {fillInBlanksCorrect ? (
+                            <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
+                          ) : (
+                            <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                                Sai rồi! Đáp án đúng là: **{currentWord.english}** 😅
+                            </p>
+                          )}
+                          <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                            <button
+                              onClick={speakWord}
+                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-300"
+                            >
+                              Nghe lại từ đúng
+                            </button>
+                            <button
+                              onClick={nextGameQuestion}
+                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-ring-blue-300"
+                            >
+                              Câu hỏi tiếp theo
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Game Score Display */}
+                      <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                        Điểm: {score} / {totalQuestions}
+                      </p>
+                      {/* Reset Game Button */}
+                      <button
+                        onClick={resetGame}
+                        className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-300"
+                      >
+                        Chơi lại Viết Từ Còn Thiếu
                       </button>
                     </div>
                   ) : (
