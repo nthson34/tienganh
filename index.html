@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Inter Font from Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
     <!-- React and ReactDOM CDNs -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -321,31 +322,31 @@
             : 0;
 
           return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-200 to-purple-300 flex flex-col items-center justify-center p-4 font-inter">
+            <div className="min-h-screen bg-gradient-to-br from-blue-200 to-purple-300 flex flex-col items-center justify-center p-4 md:p-8 lg:p-12 font-inter">
               {/* Page Title */}
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-blue-800 mb-8 drop-shadow-lg text-center">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-blue-800 mb-6 md:mb-8 drop-shadow-lg text-center leading-tight">
                 Học Tiếng Anh Thật Vui!
               </h1>
 
               {/* Mode Toggle Buttons */}
-              <div className="flex flex-wrap justify-center gap-4 mb-8">
+              <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 md:gap-4 mb-6 md:mb-8 w-full max-w-sm sm:max-w-md lg:max-w-lg">
                 <button
                   onClick={() => changeGameMode('flashcard')}
-                  className={`px-6 py-3 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
+                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-lg sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
                     ${gameMode === 'flashcard' ? 'bg-indigo-600 text-white ring-indigo-300' : 'bg-indigo-400 text-white hover:bg-indigo-500 ring-transparent'}`}
                 >
                   Thẻ Từ
                 </button>
                 <button
                   onClick={() => changeGameMode('visual_quiz')}
-                  className={`px-6 py-3 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
+                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-lg sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
                     ${gameMode === 'visual_quiz' ? 'bg-purple-600 text-white ring-purple-300' : 'bg-purple-500 text-white hover:bg-purple-600 ring-transparent'}`}
                 >
                   Trò chơi Hình ảnh & Từ
                 </button>
                 <button
                   onClick={() => changeGameMode('audio_quiz')}
-                  className={`px-6 py-3 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
+                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-lg sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
                     ${gameMode === 'audio_quiz' ? 'bg-teal-600 text-white ring-teal-300' : 'bg-teal-500 text-white hover:bg-teal-600 ring-transparent'}`}
                 >
                   Trò chơi Nghe & Chọn
@@ -354,7 +355,7 @@
 
               {/* Progress Bar */}
               {(shuffledVocabulary.length > 0) && ( // Only show if vocabulary is loaded
-                <div className="w-full max-w-sm md:max-w-md lg:max-w-lg bg-gray-200 rounded-full h-4 mb-6 overflow-hidden shadow-inner">
+                <div className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg bg-gray-200 rounded-full h-3 mb-6 overflow-hidden shadow-inner">
                   <div
                     className="bg-green-500 h-full rounded-full transition-all duration-500 ease-out"
                     style={{ width: `${progressPercentage}%` }}
@@ -362,24 +363,23 @@
                 </div>
               )}
 
-
               {currentWord ? ( // Ensure currentWord is loaded before rendering UI
                 <>
                   {gameMode === 'visual_quiz' ? (
                     // Visual Quiz Mode UI
                     <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105">
-                      <h2 className="text-3xl md:text-4xl font-bold text-gray-700 mb-6 text-center">
+                      <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
                         Từ nào có nghĩa là "{currentWord.vietnamese}"?
                       </h2>
                       {/* Removed the illustrative box for visual_quiz */}
 
-                      <div className="grid grid-cols-1 gap-4 w-full mb-6">
+                      <div className="grid grid-cols-1 gap-3 md:gap-4 w-full mb-6">
                         {quizOptions.map((option, idx) => (
                           <button
                             key={idx}
                             onClick={() => handleAnswerClick(option)}
                             disabled={selectedAnswer !== null} // Disable buttons after an answer is selected
-                            className={`py-3 px-5 rounded-full font-semibold text-xl shadow-md transition-all duration-200
+                            className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-md transition-all duration-200
                               ${selectedAnswer === null
                                 ? 'bg-blue-500 hover:bg-blue-600 text-white' // Default state
                                 : option === currentWord.english && option === selectedAnswer
@@ -401,20 +401,20 @@
                       {selectedAnswer && ( // Show feedback and next button only after an answer is selected
                         <div className="mt-4 text-center flex flex-col items-center">
                           {selectedAnswer === currentWord.english ? (
-                            <p className="text-green-700 text-2xl font-bold mb-4">Chính xác! 🎉</p>
+                            <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
                           ) : (
-                            <p className="text-red-700 text-2xl font-bold mb-4">Sai rồi! Hãy thử lại. 😅</p>
+                            <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">Sai rồi! Hãy thử lại. 😅</p>
                           )}
-                          <div className="flex flex-col md:flex-row gap-4">
+                          <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                             <button
                               onClick={speakWord}
-                              className="px-6 py-3 rounded-full font-semibold text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-300"
+                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-300"
                             >
                               Nghe lại từ đúng
                             </button>
                             <button
                               onClick={nextGameQuestion}
-                              className="px-6 py-3 rounded-full font-semibold text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-300"
                             >
                               Câu hỏi tiếp theo
                             </button>
@@ -423,13 +423,13 @@
                       )}
 
                       {/* Game Score Display */}
-                      <p className="text-xl md:text-2xl font-semibold text-gray-700 mt-6">
+                      <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
                         Điểm: {score} / {totalQuestions}
                       </p>
                       {/* Reset Game Button */}
                       <button
                         onClick={resetGame}
-                        className="mt-4 px-6 py-3 rounded-full font-semibold text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-300"
+                        className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-300"
                       >
                         Chơi lại Hình ảnh & Từ
                       </button>
@@ -437,7 +437,7 @@
                   ) : gameMode === 'audio_quiz' ? (
                     // Audio Quiz Mode UI (Listen & Choose)
                     <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105">
-                      <h2 className="text-3xl md:text-4xl font-bold text-gray-700 mb-6 text-center">
+                      <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
                         Bạn nghe từ nào?
                       </h2>
                       {/* Removed the illustrative box for audio_quiz */}
@@ -445,11 +445,11 @@
                       <button
                         onClick={speakWord}
                         disabled={!isSpeechReady}
-                        className="flex items-center px-8 py-4 bg-green-500 hover:bg-green-600 text-white font-semibold text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+                        className="flex items-center px-6 py-3 sm:px-8 sm:py-4 bg-green-500 hover:bg-green-600 text-white font-semibold text-lg sm:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          className="h-7 w-7 mr-3"
+                          className="h-6 w-6 sm:h-7 sm:w-7 mr-2 sm:mr-3"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -465,13 +465,13 @@
                         Nghe từ
                       </button>
 
-                      <div className="grid grid-cols-1 gap-4 w-full mb-6">
+                      <div className="grid grid-cols-1 gap-3 md:gap-4 w-full mb-6">
                         {quizOptions.map((option, idx) => (
                           <button
                             key={idx}
                             onClick={() => handleAnswerClick(option)}
                             disabled={selectedAnswer !== null} // Disable buttons after an answer is selected
-                            className={`py-3 px-5 rounded-full font-semibold text-xl shadow-md transition-all duration-200
+                            className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-md transition-all duration-200
                               ${selectedAnswer === null
                                 ? 'bg-blue-500 hover:bg-blue-600 text-white' // Default state
                                 : option === currentWord.english && option === selectedAnswer
@@ -493,20 +493,20 @@
                       {selectedAnswer && ( // Show feedback and next button only after an aswer is selected
                         <div className="mt-4 text-center flex flex-col items-center">
                           {selectedAnswer === currentWord.english ? (
-                            <p className="text-green-700 text-2xl font-bold mb-4">Chính xác! 🎉</p>
+                            <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
                           ) : (
-                            <p className="text-red-700 text-2xl font-bold mb-4">Sai rồi! Hãy thử lại. 😅</p>
+                            <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">Sai rồi! Hãy thử lại. 😅</p>
                           )}
-                          <div className="flex flex-col md:flex-row gap-4">
+                          <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                             <button
                               onClick={speakWord}
-                              className="px-6 py-3 rounded-full font-semibold text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-300"
+                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-300"
                             >
                               Nghe lại từ đúng
                             </button>
                             <button
                               onClick={nextGameQuestion}
-                              className="px-6 py-3 rounded-full font-semibold text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-ring-blue-300"
+                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-ring-blue-300"
                             >
                               Câu hỏi tiếp theo
                             </button>
@@ -515,13 +515,13 @@
                       )}
 
                       {/* Game Score Display */}
-                      <p className="text-xl md:text-2xl font-semibold text-gray-700 mt-6">
+                      <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
                         Điểm: {score} / {totalQuestions}
                       </p>
                       {/* Reset Game Button */}
                       <button
                         onClick={resetGame}
-                        className="mt-4 px-6 py-3 rounded-full font-semibold text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-300"
+                        className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-300"
                       >
                         Chơi lại Nghe & Chọn
                       </button>
@@ -535,12 +535,12 @@
                         const textColor = (currentWord.english === 'Black' || currentWord.english === 'Purple' || currentWord.english === 'Brown') ? 'white' : 'black';
                         return (
                           <div
-                            className={`flex items-center justify-center w-48 h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 rounded-xl mb-6 border-4 shadow-md
+                            className={`flex items-center justify-center w-full max-w-[200px] sm:max-w-[250px] md:max-w-[300px] aspect-square rounded-xl mb-6 border-4 shadow-md
                               ${isColorWord ? 'border-transparent' : 'border-purple-400'}
                             `}
                             style={isColorWord ? { backgroundColor: colorMap[currentWord.english], color: textColor } : {}}
                           >
-                            <span className={`font-bold text-center px-2 select-none ${isColorWord ? 'text-2xl md:text-3xl lg:text-4xl uppercase' : 'text-4xl md:text-5xl lg:text-6xl text-gray-700'}`}>
+                            <span className={`font-bold text-center px-2 select-none ${isColorWord ? 'text-2xl sm:text-3xl md:text-4xl uppercase' : 'text-4xl sm:text-5xl md:text-6xl text-gray-700'}`}>
                               {currentWord.english}
                             </span>
                           </div>
@@ -548,25 +548,25 @@
                       })()}
 
                       {/* English Word */}
-                      <p className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-800 mb-2 select-none tracking-wide">
+                      <p className="text-4xl sm:text-5xl lg:text-7xl font-bold text-gray-800 mb-2 select-none tracking-wide text-center px-2">
                         {currentWord.english}
                       </p>
 
                       {/* Vietnamese Translation */}
-                      <p className="text-2xl md:text-3xl lg:text-4xl text-gray-600 mb-6 select-none italic">
+                      <p className="text-xl sm:text-2xl lg:text-4xl text-gray-600 mb-6 select-none italic text-center px-2">
                         {currentWord.vietnamese}
                       </p>
 
                       {/* Action Buttons */}
-                      <div className="flex space-x-4 md:space-x-6 w-full justify-center">
+                      <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 md:space-x-6 w-full justify-center">
                         {/* Previous Button */}
                         <button
                           onClick={prevWord}
-                          className="flex items-center px-6 py-3 md:px-8 md:py-4 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold text-lg md:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="h-6 w-6 mr-2"
+                            className="h-5 w-5 sm:h-6 sm:w-6 mr-2"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -581,11 +581,11 @@
                         <button
                           onClick={speakWord}
                           disabled={!isSpeechReady}
-                          className="flex items-center px-6 py-3 md:px-8 md:py-4 bg-green-500 hover:bg-green-600 text-white font-semibold text-lg md:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-green-500 hover:bg-green-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="h-6 w-6 mr-2"
+                            className="h-5 w-5 sm:h-6 sm:w-6 mr-2"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -604,12 +604,12 @@
                         {/* Next Button */}
                         <button
                           onClick={nextWord}
-                          className="flex items-center px-6 py-3 md:px-8 md:py-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-lg md:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-300"
+                          className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-300"
                         >
                           Tiếp theo
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            className="h-6 w-6 ml-2"
+                            className="h-5 w-5 sm:h-6 sm:w-6 ml-2"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -628,7 +628,7 @@
               )}
 
               {/* Footer / Copyright (Optional) */}
-              <p className="text-gray-600 text-sm mt-8 opacity-75">
+              <p className="text-gray-600 text-xs sm:text-sm mt-8 opacity-75">
                 &copy; 2025 Trang Web Học Tiếng Anh. Dành cho các bé.
               </p>
             </div>
