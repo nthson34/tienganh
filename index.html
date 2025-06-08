@@ -27,6 +27,9 @@
     <script type="text/babel">
         // Main App component for the interactive English learning website
         function App() {
+          // Fix: Access useState and useEffect from the global React object
+          const { useState, useEffect } = React;
+
           // Define 100 vocabulary words. No imageUrl is used here, illustration is done via text/color.
           const vocabulary = [
             // Animals (10 words)
