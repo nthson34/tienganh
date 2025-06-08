@@ -7,7 +7,10 @@
     <!-- Tailwind CSS CDN for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Inter Font from Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
 
     <!-- React and ReactDOM CDNs -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -20,9 +23,44 @@
       body {
         font-family: 'Inter', sans-serif;
       }
+      /* Custom focus style for accessibility */
+      button:focus, input:focus {
+          outline: none;
+          box-shadow: 0 0 0 4px rgba(66, 153, 225, 0.5); /* A light blue ring */
+      }
+
+      /* Keyframes for animations */
+      @keyframes bounce-once {
+          0%, 100% {
+              transform: translateY(0);
+          }
+          50% {
+              transform: translateY(-10px);
+          }
+      }
+
+      @keyframes shake-once {
+          0%, 100% {
+              transform: translateX(0);
+          }
+          10%, 30%, 50%, 70%, 90% {
+              transform: translateX(-5px);
+          }
+          20%, 40%, 60%, 80% {
+              transform: translateX(5px);
+          }
+      }
+
+      /* Apply animations */
+      .animate-bounce-once {
+          animation: bounce-once 0.5s ease-in-out;
+      }
+      .animate-shake-once {
+          animation: shake-once 0.5s ease-in-out;
+      }
     </style>
 </head>
-<body class="bg-gradient-to-br from-blue-200 to-purple-300 min-h-screen flex flex-col items-center justify-center p-4">
+<body class="bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 min-h-screen flex flex-col items-center justify-center p-4">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -164,16 +202,32 @@
           const [currentShuffledIndex, setCurrentShuffledIndex] = useState(0);
           const [utterance, setUtterance] = useState(null);
           const [isSpeechReady, setIsSpeechReady] = useState(false);
-          const [gameMode, setGameMode] = useState('flashcard');
+          const [viewMode, setViewMode] = useState('game'); 
+          const [gameMode, setGameMode] = useState('flashcard'); 
+
           const [quizOptions, setQuizOptions] = useState([]);
           const [selectedAnswer, setSelectedAnswer] = useState(null);
-          const [score, setScore] = useState(0);
-          const [totalQuestions, setTotalQuestions] = useState(0);
+          
+          const [score, setScore] = useState(() => {
+            const savedScore = localStorage.getItem('englishLearningScore');
+            return savedScore ? parseInt(savedScore, 10) : 0;
+          });
+          const [totalQuestions, setTotalQuestions] = useState(() => {
+            const savedTotal = localStorage.getItem('englishLearningTotal');
+            return savedTotal ? parseInt(savedTotal, 10) : 0;
+          });
+
           const [fillInBlanksInput, setFillInBlanksInput] = useState('');
           const [blankedWord, setBlankedWord] = useState('');
           const [fillInBlanksCorrect, setFillInBlanksCorrect] = useState(null);
 
           const currentWord = shuffledVocabulary[currentShuffledIndex];
+
+          useEffect(() => {
+            localStorage.setItem('englishLearningScore', score.toString());
+            localStorage.setItem('englishLearningTotal', totalQuestions.toString());
+          }, [score, totalQuestions]);
+
 
           const shuffleAndSetNewWord = () => {
             const tempVocab = [...vocabulary];
@@ -183,7 +237,7 @@
             }
             setShuffledVocabulary(tempVocab);
             setCurrentShuffledIndex(0);
-            return tempVocab[0]; // Return the first word of the newly shuffled list
+            return tempVocab[0];
           };
 
           useEffect(() => {
@@ -215,11 +269,11 @@
             } else {
               console.warn('Trình duyệt này không hỗ trợ chức năng phát âm.');
             }
-            // Initial shuffle and setup for Flashcard mode on component mount
-            const initialWord = shuffleAndSetNewWord();
-            // No need to generate options/blanks here, as default mode is Flashcard.
-            // When user switches mode, `changeGameMode` will handle setup.
-          }, []);
+            if (viewMode === 'game') {
+                shuffleAndSetNewWord(); 
+            }
+          }, [viewMode]);
+
 
           const generateMissingLettersWord = (word) => {
             if (word.length <= 2) return word;
@@ -241,7 +295,6 @@
           };
 
 
-          // Function to generate multiple-choice options for quizzes, now takes wordObject as arg
           const generateGameOptionsForWord = (wordObject) => {
             if (!wordObject) {
                 console.error("generateGameOptionsForWord called without a valid wordObject!");
@@ -261,14 +314,12 @@
           };
 
 
-          // Unified effect for handling word changes within game modes (next/prev button clicks)
           useEffect(() => {
-            console.log('Main game logic useEffect triggered. Mode:', gameMode, 'Word:', currentWord ? currentWord.english : 'N/A');
-
-            if (!currentWord) {
-                console.log("currentWord not ready in useEffect, returning early.");
+            if (viewMode !== 'game' || !currentWord) { 
                 return;
             }
+
+            console.log('Main game logic useEffect triggered. Mode:', gameMode, 'Word:', currentWord ? currentWord.english : 'N/A');
 
             if (gameMode === 'visual_quiz' || gameMode === 'audio_quiz') {
                 console.log('Generating quiz options for:', currentWord.english);
@@ -277,11 +328,10 @@
                 console.log('Generating blanked word for:', currentWord.english);
                 setBlankedWord(generateMissingLettersWord(currentWord.english));
             }
-            // Reset states for new question within a game mode
             setSelectedAnswer(null);
             setFillInBlanksInput('');
             setFillInBlanksCorrect(null);
-          }, [currentShuffledIndex, gameMode, currentWord]); // Dependencies: Only trigger when index, mode, or word itself changes
+          }, [currentShuffledIndex, gameMode, currentWord, viewMode]);
 
 
           const speakWord = () => {
@@ -298,8 +348,8 @@
             setCurrentShuffledIndex((prevIndex) => {
               const nextIdx = (prevIndex + 1);
               if (nextIdx >= shuffledVocabulary.length) {
-                shuffleAndSetNewWord(); // This will reset index to 0 internally
-                return 0; // Ensures currentShuffledIndex state is consistent with the reset
+                shuffleAndSetNewWord();
+                return 0;
               }
               return nextIdx;
             });
@@ -332,15 +382,17 @@
             } else {
               setFillInBlanksCorrect(false);
             }
-            setTotalQuestions(prevTotal => prevTotal + 1);
+            setTotalQuestions(prevTotal => totalQuestions + 1);
           };
 
           const resetGame = () => {
             setScore(0);
             setTotalQuestions(0);
-            const newWord = shuffleAndSetNewWord(); // Get the first word of the new shuffled list
+            localStorage.setItem('englishLearningScore', '0'); 
+            localStorage.setItem('englishLearningTotal', '0'); 
+
+            const newWord = shuffleAndSetNewWord();
             
-            // Explicitly set up game for the new first word
             if (newWord) {
                 if (gameMode === 'visual_quiz' || gameMode === 'audio_quiz') {
                     generateGameOptionsForWord(newWord);
@@ -354,25 +406,21 @@
           };
 
           const nextGameQuestion = () => {
-            nextWord(); // This will trigger the main useEffect for next word
-            // States are reset within the main useEffect due to currentWord change
+            nextWord();
           };
 
           const changeGameMode = (mode) => {
             console.log("Changing game mode to:", mode);
             setGameMode(mode);
-            setScore(0);
-            setTotalQuestions(0);
+            setScore(0); 
+            setTotalQuestions(0); 
             setSelectedAnswer(null);
             setFillInBlanksInput('');
             setBlankedWord('');
             setFillInBlanksCorrect(null);
 
-            // Always reshuffle and get the first word of the new set
-            const newCurrentWord = shuffleAndSetNewWord(); // Returns the first word object
+            const newCurrentWord = shuffleAndSetNewWord();
 
-            // Based on the new mode and the explicitly obtained newCurrentWord,
-            // immediately set up the game state.
             if (newCurrentWord) {
                 if (mode === 'visual_quiz' || mode === 'audio_quiz') {
                     console.log('Setting up quiz options for mode:', mode, 'and word:', newCurrentWord.english);
@@ -384,8 +432,15 @@
             } else {
                 console.error("Failed to get a new current word after shuffling in changeGameMode for mode:", mode);
             }
-            // No need to call generateGameOptions/setBlankedWord again in useEffect
-            // if it's already set here for the initial mode switch.
+          };
+
+          const resetAllProgress = () => {
+            setScore(0);
+            setTotalQuestions(0);
+            localStorage.setItem('englishLearningScore', '0');
+            localStorage.setItem('englishLearningTotal', '0');
+            // Using alert for simplicity; consider a custom modal for better UX
+            alert('Tiến độ học tập đã được đặt lại!'); 
           };
 
           const progressPercentage = (shuffledVocabulary.length > 0)
@@ -393,380 +448,387 @@
             : 0;
 
           return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-200 to-purple-300 flex flex-col items-center justify-center p-4 md:p-8 lg:p-12 font-inter">
+            <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4 md:p-8 lg:p-12 font-inter text-gray-800">
               {/* Page Title */}
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-blue-800 mb-6 md:mb-8 drop-shadow-lg text-center leading-tight">
-                Học Tiếng Anh Thật Vui!
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 md:mb-8 drop-shadow-lg text-center leading-tight">
+                Học Tiếng Anh Thật Vui! <i className="fas fa-child text-yellow-300 ml-3"></i>
               </h1>
 
-              {/* Mode Toggle Buttons */}
-              <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 md:gap-4 mb-6 md:mb-8 w-full max-w-sm sm:max-w-md lg:max-w-lg">
+              {/* Main Navigation - Game Modes vs. Progress */}
+              <div className="flex flex-wrap justify-center gap-3 md:gap-4 mb-6 md:mb-8 w-full max-w-lg">
                 <button
-                  onClick={() => changeGameMode('flashcard')}
-                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-lg sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
-                    ${gameMode === 'flashcard' ? 'bg-indigo-600 text-white ring-indigo-300' : 'bg-indigo-400 text-white hover:bg-indigo-500 ring-transparent'}`}
+                  onClick={() => setViewMode('game')}
+                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-lg sm:text-xl shadow-xl transition-all duration-300 transform hover:scale-105
+                    ${viewMode === 'game' ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white ring-4 ring-blue-300' : 'bg-blue-400 text-white hover:bg-blue-500 hover:shadow-2xl'}`}
                 >
-                  Thẻ Từ
+                  <i className="fas fa-gamepad mr-2"></i> Trò Chơi
                 </button>
                 <button
-                  onClick={() => changeGameMode('visual_quiz')}
-                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-lg sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
-                    ${gameMode === 'visual_quiz' ? 'bg-purple-600 text-white ring-purple-300' : 'bg-purple-500 text-white hover:bg-purple-600 ring-transparent'}`}
+                  onClick={() => setViewMode('progress')}
+                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-lg sm:text-xl shadow-xl transition-all duration-300 transform hover:scale-105
+                    ${viewMode === 'progress' ? 'bg-gradient-to-r from-green-600 to-green-800 text-white ring-4 ring-green-300' : 'bg-green-500 text-white hover:bg-green-600 hover:shadow-2xl'}`}
                 >
-                  Trò chơi Hình ảnh & Từ
-                </button>
-                <button
-                  onClick={() => changeGameMode('audio_quiz')}
-                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-lg sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
-                    ${gameMode === 'audio_quiz' ? 'bg-teal-600 text-white ring-teal-300' : 'bg-teal-500 text-white hover:bg-teal-600 ring-transparent'}`}
-                >
-                  Trò chơi Nghe & Chọn
-                </button>
-                <button
-                  onClick={() => changeGameMode('fill_in_blanks')}
-                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-lg sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4
-                    ${gameMode === 'fill_in_blanks' ? 'bg-red-600 text-white ring-red-300' : 'bg-red-500 text-white hover:bg-red-600 ring-transparent'}`}
-                >
-                  Viết Từ Còn Thiếu
+                  <i className="fas fa-chart-line mr-2"></i> Xem Tiến Độ
                 </button>
               </div>
 
-              {/* Progress Bar */}
-              {(shuffledVocabulary.length > 0) && ( // Only show if vocabulary is loaded
-                <div className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg bg-gray-200 rounded-full h-3 mb-6 overflow-hidden shadow-inner">
-                  <div
-                    className="bg-green-500 h-full rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${progressPercentage}%` }}
-                  ></div>
-                </div>
-              )}
-
-              {currentWord ? ( // Ensure currentWord is loaded before rendering UI
+              {viewMode === 'game' ? (
                 <>
-                  {gameMode === 'visual_quiz' ? (
-                    // Visual Quiz Mode UI
-                    <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105">
-                      <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
-                        Từ nào có nghĩa là "{currentWord.vietnamese}"?
-                      </h2>
+                  {/* Mode Toggle Buttons for Games */}
+                  <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 md:gap-4 mb-6 md:mb-8 w-full max-w-sm sm:max-w-md lg:max-w-lg">
+                    <button
+                      onClick={() => changeGameMode('flashcard')}
+                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                        ${gameMode === 'flashcard' ? 'bg-indigo-600 text-white ring-2 ring-indigo-300' : 'bg-indigo-400 text-white hover:bg-indigo-500'}`}
+                    >
+                      Thẻ Từ
+                    </button>
+                    <button
+                      onClick={() => changeGameMode('visual_quiz')}
+                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                        ${gameMode === 'visual_quiz' ? 'bg-purple-600 text-white ring-2 ring-purple-300' : 'bg-purple-500 text-white hover:bg-purple-600'}`}
+                    >
+                      Trò chơi Hình ảnh & Từ
+                    </button>
+                    <button
+                      onClick={() => changeGameMode('audio_quiz')}
+                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                        ${gameMode === 'audio_quiz' ? 'bg-teal-600 text-white ring-2 ring-teal-300' : 'bg-teal-500 text-white hover:bg-teal-600'}`}
+                    >
+                      Trò chơi Nghe & Chọn
+                    </button>
+                    <button
+                      onClick={() => changeGameMode('fill_in_blanks')}
+                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                        ${gameMode === 'fill_in_blanks' ? 'bg-red-600 text-white ring-2 ring-red-300' : 'bg-red-500 text-white hover:bg-red-600'}`}
+                    >
+                      Viết Từ Còn Thiếu
+                    </button>
+                  </div>
 
-                      <div className="grid grid-cols-1 gap-3 md:gap-4 w-full mb-6">
-                        {quizOptions.map((option, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => handleAnswerClick(option)}
-                            disabled={selectedAnswer !== null}
-                            className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-md transition-all duration-200
-                              ${selectedAnswer === null
-                                ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                                : option.toLowerCase() === currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
-                                  ? 'bg-green-500 text-white'
-                                  : option.toLowerCase() !== currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
-                                    ? 'bg-red-500 text-white'
-                                    : option.toLowerCase() === currentWord.english.toLowerCase() && selectedAnswer !== null
-                                      ? 'bg-green-300 text-gray-800'
-                                      : 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                              }
-                              ${selectedAnswer && 'opacity-75'}
-                            `}
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-
-                      {selectedAnswer && (
-                        <div className="mt-4 text-center flex flex-col items-center">
-                          {selectedAnswer.toLowerCase() === currentWord.english.toLowerCase() ? (
-                            <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
-                          ) : (
-                            <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
-                                Sai rồi! Đáp án đúng là: **{currentWord.english}** 😅
-                            </p>
-                          )}
-                          <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                            <button
-                              onClick={speakWord}
-                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-300"
-                            >
-                              Nghe lại từ đúng
-                            </button>
-                            <button
-                              onClick={nextGameQuestion}
-                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-300"
-                            >
-                              Câu hỏi tiếp theo
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
-                        Điểm: {score} / {totalQuestions}
-                      </p>
-                      <button
-                        onClick={resetGame}
-                        className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-300"
-                      >
-                        Chơi lại Hình ảnh & Từ
-                      </button>
+                  {/* Progress Bar for Games */}
+                  {(shuffledVocabulary.length > 0) && (
+                    <div className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg bg-gray-200 rounded-full h-3 mb-6 overflow-hidden shadow-inner">
+                      <div
+                        className="bg-gradient-to-r from-yellow-400 to-green-500 h-full rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${progressPercentage}%` }}
+                      ></div>
                     </div>
-                  ) : gameMode === 'audio_quiz' ? (
-                    // Audio Quiz Mode UI (Listen & Choose)
-                    <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105">
-                      <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
-                        Bạn nghe từ nào?
-                      </h2>
-                      <button
-                        onClick={speakWord}
-                        disabled={!isSpeechReady}
-                        className="flex items-center px-6 py-3 sm:px-8 sm:py-4 bg-green-500 hover:bg-green-600 text-white font-semibold text-lg sm:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-6 w-6 sm:h-7 sm:w-7 mr-2 sm:mr-3"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M17.293 13.293A8 8 0 0120 10a8 8 0 01-2.707-6.707A8 8 0 0012 4c-3.111 0-5.69 1.769-6.494 4.195l-.161.493a8 8 0 00-2.455 3.313A8 8 0 0012 16c3.111 0 5.69-1.769 6.494-4.195l.161-.493a8 8 0 002.455-3.313z"
+                  )}
+
+                  {currentWord ? (
+                    <>
+                      {gameMode === 'visual_quiz' ? (
+                        // Visual Quiz Mode UI
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-purple-200">
+                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                            Từ nào có nghĩa là "{currentWord.vietnamese}"?
+                          </h2>
+
+                          <div className="grid grid-cols-1 gap-3 md:gap-4 w-full mb-6">
+                            {quizOptions.map((option, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => handleAnswerClick(option)}
+                                disabled={selectedAnswer !== null}
+                                className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95
+                                  ${selectedAnswer === null
+                                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                                    : option.toLowerCase() === currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
+                                      ? 'bg-green-500 text-white animate-bounce-once'
+                                      : option.toLowerCase() !== currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
+                                        ? 'bg-red-500 text-white animate-shake-once'
+                                        : option.toLowerCase() === currentWord.english.toLowerCase() && selectedAnswer !== null
+                                          ? 'bg-green-300 text-gray-800 border-2 border-green-500'
+                                          : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
+                                  }`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+
+                          {selectedAnswer && (
+                            <div className="mt-4 text-center flex flex-col items-center">
+                              {selectedAnswer.toLowerCase() === currentWord.english.toLowerCase() ? (
+                                <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
+                              ) : (
+                                <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                                    Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
+                                </p>
+                              )}
+                              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                                <button
+                                  onClick={speakWord}
+                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                                >
+                                  <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
+                                </button>
+                                <button
+                                  onClick={nextGameQuestion}
+                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                                >
+                                  Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                            Điểm: {score} / {totalQuestions}
+                          </p>
+                          <button
+                            onClick={resetGame}
+                            className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                          >
+                            <i className="fas fa-redo mr-2"></i> Chơi lại Hình ảnh & Từ
+                          </button>
+                        </div>
+                      ) : gameMode === 'audio_quiz' ? (
+                        // Audio Quiz Mode UI (Listen & Choose)
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-teal-200">
+                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                            Bạn nghe từ nào?
+                          </h2>
+                          <button
+                            onClick={speakWord}
+                            disabled={!isSpeechReady}
+                            className="flex items-center justify-center px-6 py-3 sm:px-8 sm:py-4 bg-green-500 hover:bg-green-600 text-white font-semibold text-lg sm:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+                          >
+                            <i className="fas fa-volume-up mr-2"></i> Nghe từ
+                          </button>
+
+                          <div className="grid grid-cols-1 gap-3 md:gap-4 w-full mb-6">
+                            {quizOptions.map((option, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => handleAnswerClick(option)}
+                                disabled={selectedAnswer !== null}
+                                className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95
+                                  ${selectedAnswer === null
+                                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                                    : option.toLowerCase() === currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
+                                      ? 'bg-green-500 text-white animate-bounce-once'
+                                      : option.toLowerCase() !== currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
+                                        ? 'bg-red-500 text-white animate-shake-once'
+                                      : option.toLowerCase() === currentWord.english.toLowerCase() && selectedAnswer !== null
+                                          ? 'bg-green-300 text-gray-800 border-2 border-green-500'
+                                          : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
+                                  }`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+
+                          {selectedAnswer && (
+                            <div className="mt-4 text-center flex flex-col items-center">
+                              {selectedAnswer.toLowerCase() === currentWord.english.toLowerCase() ? (
+                                <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
+                              ) : (
+                                <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                                    Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
+                                </p>
+                              )}
+                              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                                <button
+                                  onClick={speakWord}
+                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                                >
+                                  <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
+                                </button>
+                                <button
+                                  onClick={nextGameQuestion}
+                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                                >
+                                  Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                            Điểm: {score} / {totalQuestions}
+                          </p>
+                          <button
+                            onClick={resetGame}
+                            className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                          >
+                            <i className="fas fa-redo mr-2"></i> Chơi lại Nghe & Chọn
+                          </button>
+                        </div>
+                      ) : gameMode === 'fill_in_blanks' ? (
+                        // Fill in the Blanks Mode UI
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-red-200">
+                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                            Điền từ còn thiếu vào chỗ trống:
+                          </h2>
+
+                          <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 mb-4 select-none italic text-center px-2">
+                            "{currentWord.vietnamese}"
+                          </p>
+
+                          <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-800 mb-6 tracking-wide text-center px-2">
+                            {blankedWord}
+                          </p>
+
+                          <input
+                            type="text"
+                            value={fillInBlanksInput}
+                            onChange={handleFillInBlanksInput}
+                            disabled={fillInBlanksCorrect !== null}
+                            className="w-full max-w-xs md:max-w-sm lg:max-w-md px-4 py-3 mb-6 border-2 border-orange-400 rounded-lg text-xl md:text-2xl text-center focus:outline-none focus:ring-2 focus:ring-orange-500 transition duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed shadow-md"
+                            placeholder="Nhập từ tiếng Anh..."
                           />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 13H7V9h2a2 2 0 012 2v2a2 2 0 01-2 2z" />
-                        </svg>
-                        Nghe từ
-                      </button>
 
-                      <div className="grid grid-cols-1 gap-3 md:gap-4 w-full mb-6">
-                        {quizOptions.map((option, idx) => (
                           <button
-                            key={idx}
-                            onClick={() => handleAnswerClick(option)}
-                            disabled={selectedAnswer !== null}
-                            className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-md transition-all duration-200
-                              ${selectedAnswer === null
-                                ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                                : option.toLowerCase() === currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
-                                  ? 'bg-green-500 text-white'
-                                  : option.toLowerCase() !== currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
-                                    ? 'bg-red-500 text-white'
-                                    : option.toLowerCase() === currentWord.english.toLowerCase() && selectedAnswer !== null
-                                      ? 'bg-green-300 text-gray-800'
-                                      : 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                              }
-                              ${selectedAnswer && 'opacity-75'}
-                            `}
+                            onClick={handleFillInBlanksSubmit}
+                            disabled={fillInBlanksCorrect !== null || fillInBlanksInput.trim() === ''}
+                            className={`px-8 py-4 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 mb-6
+                              ${fillInBlanksCorrect === null
+                                ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                                : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
+                              }`}
                           >
-                            {option}
+                            <i className="fas fa-check-circle mr-2"></i> Kiểm tra
                           </button>
-                        ))}
-                      </div>
 
-                      {selectedAnswer && (
-                        <div className="mt-4 text-center flex flex-col items-center">
-                          {selectedAnswer.toLowerCase() === currentWord.english.toLowerCase() ? (
-                            <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
-                          ) : (
-                            <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
-                                Sai rồi! Đáp án đúng là: **{currentWord.english}** 😅
-                            </p>
+                          {fillInBlanksCorrect !== null && (
+                            <div className="mt-4 text-center flex flex-col items-center">
+                              {fillInBlanksCorrect ? (
+                                <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
+                              ) : (
+                                <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                                    Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
+                                </p>
+                              )}
+                              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                                <button
+                                  onClick={speakWord}
+                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                                >
+                                  <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
+                                </button>
+                                <button
+                                  onClick={nextGameQuestion}
+                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                                >
+                                  Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
+                                </button>
+                              </div>
+                            </div>
                           )}
-                          <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+
+                          <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                            Điểm: {score} / {totalQuestions}
+                          </p>
+                          <button
+                            onClick={resetGame}
+                            className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                          >
+                            <i className="fas fa-redo mr-2"></i> Chơi lại Viết Từ Còn Thiếu
+                          </button>
+                        </div>
+                      ) : (
+                        // Flashcard Mode UI
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-indigo-200">
+                          {(() => {
+                            const isColorWord = colorWords.includes(currentWord.english);
+                            const textColor = (currentWord.english === 'Black' || currentWord.english === 'Purple' || currentWord.english === 'Brown') ? 'white' : 'black';
+                            return (
+                              <div
+                                className={`flex items-center justify-center w-full max-w-[200px] sm:max-w-[250px] md:max-w-[300px] aspect-square rounded-xl mb-6 border-4 shadow-lg
+                                  ${isColorWord ? 'border-transparent' : 'border-purple-400'}
+                                `}
+                                style={isColorWord ? { backgroundColor: colorMap[currentWord.english], color: textColor } : {}}
+                              >
+                                <span className={`font-bold text-center px-2 select-none ${isColorWord ? 'text-2xl sm:text-3xl md:text-4xl uppercase' : 'text-4xl sm:text-5xl md:text-6xl text-gray-700'}`}>
+                                  {currentWord.english}
+                                </span>
+                              </div>
+                            );
+                          })()}
+
+                          <p className="text-4xl sm:text-5xl lg:text-7xl font-bold text-gray-800 mb-2 select-none tracking-wide text-center px-2">
+                            {currentWord.english}
+                          </p>
+
+                          <p className="text-xl sm:text-2xl lg:text-4xl text-gray-600 mb-6 select-none italic text-center px-2">
+                            {currentWord.vietnamese}
+                          </p>
+
+                          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 md:space-x-6 w-full justify-center">
+                            <button
+                              onClick={prevWord}
+                              className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <i className="fas fa-arrow-left mr-2"></i> Trước
+                            </button>
+
                             <button
                               onClick={speakWord}
-                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-300"
+                              disabled={!isSpeechReady}
+                              className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-green-500 hover:bg-green-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              Nghe lại từ đúng
+                              <i className="fas fa-volume-up mr-2"></i> Nghe
                             </button>
+
                             <button
-                              onClick={nextGameQuestion}
-                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-ring-blue-300"
+                              onClick={nextWord}
+                              className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95"
                             >
-                              Câu hỏi tiếp theo
+                              Tiếp theo <i className="fas fa-arrow-right ml-2"></i>
                             </button>
                           </div>
                         </div>
                       )}
-
-                      <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
-                        Điểm: {score} / {totalQuestions}
-                      </p>
-                      <button
-                        onClick={resetGame}
-                        className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-300"
-                      >
-                        Chơi lại Nghe & Chọn
-                      </button>
-                    </div>
-                  ) : gameMode === 'fill_in_blanks' ? (
-                    // Fill in the Blanks Mode UI
-                    <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105">
-                      <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
-                        Điền từ còn thiếu vào chỗ trống:
-                      </h2>
-
-                      <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 mb-4 select-none italic text-center px-2">
-                        "{currentWord.vietnamese}"
-                      </p>
-
-                      <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-800 mb-6 tracking-wide text-center px-2">
-                        {blankedWord}
-                      </p>
-
-                      <input
-                        type="text"
-                        value={fillInBlanksInput}
-                        onChange={handleFillInBlanksInput}
-                        disabled={fillInBlanksCorrect !== null}
-                        className="w-full max-w-xs md:max-w-sm lg:max-w-md px-4 py-3 mb-6 border-2 border-blue-400 rounded-lg text-xl md:text-2xl text-center focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        placeholder="Nhập từ tiếng Anh..."
-                      />
-
-                      <button
-                        onClick={handleFillInBlanksSubmit}
-                        disabled={fillInBlanksCorrect !== null || fillInBlanksInput.trim() === ''}
-                        className={`px-8 py-4 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4 mb-6
-                          ${fillInBlanksCorrect === null
-                            ? 'bg-orange-500 hover:bg-orange-600 text-white ring-orange-300'
-                            : 'bg-gray-300 text-gray-600 cursor-not-allowed ring-transparent'
-                          }`}
-                      >
-                        Kiểm tra
-                      </button>
-
-                      {fillInBlanksCorrect !== null && (
-                        <div className="mt-4 text-center flex flex-col items-center">
-                          {fillInBlanksCorrect ? (
-                            <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
-                          ) : (
-                            <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
-                                Sai rồi! Đáp án đúng là: **{currentWord.english}** 😅
-                            </p>
-                          )}
-                          <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                            <button
-                              onClick={speakWord}
-                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-300"
-                            >
-                              Nghe lại từ đúng
-                            </button>
-                            <button
-                              onClick={nextGameQuestion}
-                              className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-ring-blue-300"
-                            >
-                              Câu hỏi tiếp theo
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
-                        Điểm: {score} / {totalQuestions}
-                      </p>
-                      <button
-                        onClick={resetGame}
-                        className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-300"
-                      >
-                        Chơi lại Viết Từ Còn Thiếu
-                      </button>
-                    </div>
+                    </>
                   ) : (
-                    // Flashcard Mode UI
-                    <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105">
-                      {(() => {
-                        const isColorWord = colorWords.includes(currentWord.english);
-                        const textColor = (currentWord.english === 'Black' || currentWord.english === 'Purple' || currentWord.english === 'Brown') ? 'white' : 'black';
-                        return (
-                          <div
-                            className={`flex items-center justify-center w-full max-w-[200px] sm:max-w-[250px] md:max-w-[300px] aspect-square rounded-xl mb-6 border-4 shadow-md
-                              ${isColorWord ? 'border-transparent' : 'border-purple-400'}
-                            `}
-                            style={isColorWord ? { backgroundColor: colorMap[currentWord.english], color: textColor } : {}}
-                          >
-                            <span className={`font-bold text-center px-2 select-none ${isColorWord ? 'text-2xl sm:text-3xl md:text-4xl uppercase' : 'text-4xl sm:text-5xl md:text-6xl text-gray-700'}`}>
-                              {currentWord.english}
-                            </span>
-                          </div>
-                        );
-                      })()}
-
-                      <p className="text-4xl sm:text-5xl lg:text-7xl font-bold text-gray-800 mb-2 select-none tracking-wide text-center px-2">
-                        {currentWord.english}
-                      </p>
-
-                      <p className="text-xl sm:text-2xl lg:text-4xl text-gray-600 mb-6 select-none italic text-center px-2">
-                        {currentWord.vietnamese}
-                      </p>
-
-                      <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 md:space-x-6 w-full justify-center">
-                        <button
-                          onClick={prevWord}
-                          className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 sm:h-6 sm:w-6 mr-2"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                          </svg>
-                          Trước
-                        </button>
-
-                        <button
-                          onClick={speakWord}
-                          disabled={!isSpeechReady}
-                          className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-green-500 hover:bg-green-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 sm:h-6 sm:w-6 mr-2"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M17.293 13.293A8 8 0 0120 10a8 8 0 01-2.707-6.707A8 8 0 0012 4c-3.111 0-5.69 1.769-6.494 4.195l-.161.493a8 8 0 00-2.455 3.313A8 8 0 0012 16c3.111 0 5.69-1.769 6.494-4.195l.161-.493a8 8 0 002.455-3.313z"
-                            />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 13H7V9h2a2 2 0 012 2v2a2 2 0 01-2 2z" />
-                          </svg>
-                          Nghe
-                        </button>
-
-                        <button
-                          onClick={nextWord}
-                          className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-300"
-                        >
-                          Tiếp theo
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 sm:h-6 sm:w-6 ml-2"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
+                    <div className="text-xl text-gray-700">Đang tải từ vựng...</div>
                   )}
                 </>
               ) : (
-                <div className="text-xl text-gray-700">Đang tải từ vựng...</div>
+                // Progress Page UI
+                <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-green-200">
+                  <h2 className="text-3xl md:text-4xl font-bold text-gray-700 mb-6 text-center">
+                    Tiến Độ Học Tập <i className="fas fa-chart-pie ml-2 text-orange-400"></i>
+                  </h2>
+                  <div className="text-center mb-8 bg-blue-50 p-4 rounded-xl shadow-inner w-full">
+                    <p className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
+                      Số câu đúng: <span className="text-green-600">{score}</span>
+                    </p>
+                    <p className="text-2xl md:text-3xl font-bold text-gray-800">
+                      Tổng số câu đã thử: <span className="text-blue-600">{totalQuestions}</span>
+                    </p>
+                    {totalQuestions > 0 && (
+                      <p className="text-xl md:text-2xl font-bold text-gray-700 mt-4">
+                        Tỷ lệ đúng: <span className="font-extrabold text-purple-600">{(score / totalQuestions * 100).toFixed(2)}%</span>
+                      </p>
+                    )}
+                    {totalQuestions === 0 && (
+                      <p className="text-lg text-gray-500 mt-4">
+                        Hãy bắt đầu chơi để xem tiến độ của bạn!
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+                    <button
+                      onClick={resetAllProgress}
+                      className="px-6 py-3 rounded-full font-semibold text-lg bg-red-500 text-white shadow-lg hover:bg-red-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                    >
+                      <i className="fas fa-eraser mr-2"></i> Đặt Lại Tiến Độ
+                    </button>
+                    <button
+                      onClick={() => setViewMode('game')}
+                      className="px-6 py-3 rounded-full font-semibold text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                    >
+                      <i className="fas fa-play-circle mr-2"></i> Quay Lại Trò Chơi
+                    </button>
+                  </div>
+                </div>
               )}
 
-              <p className="text-gray-600 text-xs sm:text-sm mt-8 opacity-75">
+              <p className="text-gray-700 text-xs sm:text-sm mt-8 opacity-75">
                 &copy; 2025 Trang Web Học Tiếng Anh. Dành cho các bé.
               </p>
             </div>
