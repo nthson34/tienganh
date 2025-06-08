@@ -1,12 +1,11 @@
 # Tên của workflow này, sẽ hiển thị trong tab 'Actions' của GitHub.
 name: Deploy to GitHub Pages
 
-# Kích hoạt workflow khi có sự kiện push (đẩy code) lên nhánh 'main'.
-# Hoặc thay 'main' bằng 'master' nếu đó là nhánh chính của bạn.
+# Kích hoạt workflow khi có sự kiện push (đẩy code) lên nhánh 'master'.
 on:
   push:
     branches:
-      - main # Thay thế bằng tên nhánh chính của bạn nếu khác (ví dụ: master)
+      - master # Đã thay đổi từ 'main' thành 'master'
 
 # Các công việc (jobs) mà workflow này sẽ thực hiện.
 jobs:
