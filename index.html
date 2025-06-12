@@ -24,9 +24,8 @@
 
     <!-- React and ReactDOM CDNs -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Babel for in-browser JSX transformation -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
       /* Custom styles if needed, but Tailwind is preferred */
@@ -96,13 +95,65 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // Define __app_id and __firebase_config globally for consistent access
+        // These values will be overridden by the Canvas environment if present
+        // but provide a fallback for direct browser execution.
+        window.__app_id = typeof window.__app_id !== 'undefined' ? window.__app_id : "tienganh-b5c92";
+        window.__firebase_config = typeof window.__firebase_config !== 'undefined'
+            ? window.__firebase_config
+            : JSON.stringify({
+                apiKey: "AIzaSyC5FTPfRIvLKhcGN6jDKEMXGx0eT_PoGfQ",
+                authDomain: "tienganh-b5c92.firebaseapp.com",
+                projectId: "tienganh-b5c92",
+                storageBucket: "tienganh-b5c92.firebasestorage.app",
+                messagingSenderId: "1097712667266",
+                appId: "1:1097712667266:web:6c2ac844975f6a8a99429b",
+                measurementId: "G-K6FNDEE49T"
+              });
+
         // Main App component for the interactive English learning website
         function App() {
           // Destructure React hooks and Firebase global objects
           const { useState, useEffect, useRef } = React;
           const { initializeApp, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, getFirestore, doc, setDoc, onSnapshot, deleteDoc } = window.firebase;
 
-          // Vocabulary data remains the same
+          // --- Message Box Component ---
+          const MessageBox = ({ message, type, onClose }) => {
+              const bgColor = type === 'success' ? 'bg-green-100 border-green-400 text-green-700' :
+                              type === 'error' ? 'bg-red-100 border-red-400 text-red-700' :
+                              'bg-blue-100 border-blue-400 text-blue-700';
+              const icon = type === 'success' ? 'fas fa-check-circle' :
+                           type === 'error' ? 'fas fa-times-circle' :
+                           'fas fa-info-circle';
+
+              return (
+                  <div className={`fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4`}>
+                      <div className={`relative ${bgColor} border rounded-lg shadow-xl p-6 max-w-sm w-full text-center`}>
+                          <div className="flex items-center justify-center mb-4">
+                              <i className={`${icon} text-3xl mr-3`}></i>
+                              <p className="font-semibold text-lg">{message}</p>
+                          </div>
+                          <button
+                              onClick={onClose}
+                              className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition duration-200 shadow-md"
+                          >
+                              Đóng
+                          </button>
+                      </div>
+                  </div>
+              );
+          };
+
+          const [messageBox, setMessageBox] = useState(null); // { message, type }
+
+          const showMessageBox = (message, type = 'info') => {
+              setMessageBox({ message, type });
+          };
+
+          const closeMessageBox = () => {
+              setMessageBox(null);
+          };
+
           const vocabulary = [
             // Animals (10 words)
             { english: 'Cat', vietnamese: 'Mèo' },
@@ -290,8 +341,9 @@
 
           // --- Firebase Initialization and Auth Effect ---
           useEffect(() => {
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+            // Using window.__app_id and window.__firebase_config directly now
+            const appId = window.__app_id; 
+            const firebaseConfig = JSON.parse(window.__firebase_config);
 
             if (Object.keys(firebaseConfig).length === 0) {
                 console.error("Firebase config is missing or empty.");
@@ -331,7 +383,7 @@
                 return;
             }
 
-            const userProgressDocRef = doc(db, `artifacts/${__app_id}/users/${userId}/learningProgress/userProgress`);
+            const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/users/${userId}/learningProgress/userProgress`);
 
             // Set up a real-time listener for user progress
             const unsubscribe = onSnapshot(userProgressDocRef, (docSnap) => {
@@ -349,10 +401,11 @@
               }
             }, (error) => {
                 console.error("Error fetching Firestore progress:", error);
+                showMessageBox(`Lỗi khi tải tiến độ: ${error.message}`, 'error');
             });
 
             return () => unsubscribe(); // Cleanup listener on unmount
-          }, [db, userId, currentUser, __app_id]); // Dependencies: db, userId, currentUser
+          }, [db, userId, currentUser, window.__app_id]); // Dependencies: db, userId, currentUser
 
 
           // --- Update Firestore on Score/TotalQuestions Change ---
@@ -363,23 +416,26 @@
             // Only update Firestore if score or totalQuestions has changed from initial load
             // and if totalQuestions is not 0 (to avoid writing empty docs unnecessarily on init)
             if (totalQuestions > 0 || score > 0) { // Only write if there's actual progress
-                const userProgressDocRef = doc(db, `artifacts/${__app_id}/users/${userId}/learningProgress/userProgress`);
+                const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/users/${userId}/learningProgress/userProgress`);
                 setDoc(userProgressDocRef, { score, totalQuestions }, { merge: true })
-                    .catch(e => console.error("Error updating Firestore progress:", e));
+                    .catch(e => {
+                        console.error("Error updating Firestore progress:", e);
+                        showMessageBox(`Lỗi khi lưu tiến độ: ${e.message}`, 'error');
+                    });
             }
             
             // Achievement checks (still local for simplicity as per last request)
             if (score >= 1 && !firstCorrectAchievement) {
                 setFirstCorrectAchievement(true);
                 localStorage.setItem('firstCorrectAchievement', 'true');
-                alert('🎉 Chúc mừng! Bạn đã có câu trả lời đúng đầu tiên!');
+                showMessageBox('🎉 Chúc mừng! Bạn đã có câu trả lời đúng đầu tiên!', 'success');
             }
             if (score >= 10 && !tenCorrectAchievement) {
                 setTenCorrectAchievement(true);
                 localStorage.setItem('tenCorrectAchievement', 'true');
-                alert('🏆 Tuyệt vời! Bạn đã có 10 câu trả lời đúng!');
+                showMessageBox('🏆 Tuyệt vời! Bạn đã có 10 câu trả lời đúng!', 'success');
             }
-          }, [score, totalQuestions, db, userId, currentUser, firstCorrectAchievement, tenCorrectAchievement, __app_id]);
+          }, [score, totalQuestions, db, userId, currentUser, firstCorrectAchievement, tenCorrectAchievement, window.__app_id]);
 
 
           const shuffleAndSetNewWord = () => {
@@ -539,7 +595,7 @@
             if (matchedPairs > 0 && matchedPairs * 2 === matchingCards.length && matchingCards.length > 0) {
                 setTimeout(() => {
                     setMatchingGameComplete(true);
-                    alert('🎉 Chúc mừng! Bạn đã hoàn thành trò chơi ghép cặp!'); // Or a custom modal
+                    showMessageBox('🎉 Chúc mừng! Bạn đã hoàn thành trò chơi ghép cặp!', 'success');
                 }, 500);
             }
           }, [matchedPairs, matchingCards.length]);
@@ -676,7 +732,7 @@
           };
 
           const handleFillInBlanksInput = (event) => {
-            setEmail(event.target.value); // Used for email in auth form
+            // setEmail(event.target.value); // This was incorrectly mapping to email for auth form
             setFillInBlanksInput(event.target.value); // Used for fill in blanks game
           };
 
@@ -754,11 +810,11 @@
 
           const resetAllProgress = async () => {
             if (!db || !userId) {
-                alert('Firebase chưa sẵn sàng hoặc bạn chưa đăng nhập.');
+                showMessageBox('Firebase chưa sẵn sàng hoặc bạn chưa đăng nhập.', 'error');
                 return;
             }
             try {
-                const userProgressDocRef = doc(db, `artifacts/${__app_id}/users/${userId}/learningProgress/userProgress`);
+                const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/users/${userId}/learningProgress/userProgress`);
                 await deleteDoc(userProgressDocRef);
                 
                 // Also reset achievement flags in local storage
@@ -767,11 +823,11 @@
                 setTenCorrectAchievement(false);
                 localStorage.setItem('tenCorrectAchievement', 'false');
 
-                alert('Tiến độ học tập và thành tích đã được đặt lại trên Cloud!');
+                showMessageBox('Tiến độ học tập và thành tích đã được đặt lại trên Cloud!', 'success');
                 // Score/totalQuestions states will be reset by the onSnapshot listener after deletion
             } catch (error) {
                 console.error("Error resetting progress in Firestore:", error);
-                alert('Có lỗi xảy ra khi đặt lại tiến độ. Vui lòng thử lại.');
+                showMessageBox(`Có lỗi xảy ra khi đặt lại tiến độ: ${error.message}`, 'error');
             }
           };
 
@@ -785,10 +841,11 @@
             try {
               await createUserWithEmailAndPassword(auth, email, password);
               // User will be automatically signed in, onAuthStateChanged will handle state update
-              alert('Đăng ký thành công! Bạn đã được đăng nhập.');
+              showMessageBox('Đăng ký thành công! Bạn đã được đăng nhập.', 'success');
             } catch (error) {
               setAuthError(error.message);
               console.error("Error during sign up:", error);
+              showMessageBox(`Lỗi đăng ký: ${error.message}`, 'error');
             }
           };
 
@@ -797,10 +854,11 @@
             try {
               await signInWithEmailAndPassword(auth, email, password);
               // User will be automatically signed in, onAuthStateChanged will handle state update
-              alert('Đăng nhập thành công!');
+              showMessageBox('Đăng nhập thành công!', 'success');
             } catch (error) {
               setAuthError(error.message);
               console.error("Error during sign in:", error);
+              showMessageBox(`Lỗi đăng nhập: ${error.message}`, 'error');
             }
           };
 
@@ -811,10 +869,11 @@
               // currentUser and userId will be nullified by onAuthStateChanged listener
               setEmail('');
               setPassword('');
-              alert('Bạn đã đăng xuất.');
+              showMessageBox('Bạn đã đăng xuất.', 'info');
             } catch (error) {
               setAuthError(error.message);
               console.error("Error during sign out:", error);
+              showMessageBox(`Lỗi đăng xuất: ${error.message}`, 'error');
             }
           };
 
@@ -870,6 +929,7 @@
                     <i className="fas fa-user-plus mr-2"></i> Đăng ký
                   </button>
                 </div>
+                {messageBox && <MessageBox message={messageBox.message} type={messageBox.type} onClose={closeMessageBox} />}
               </div>
             );
           }
@@ -1450,6 +1510,7 @@
               <p className="text-gray-700 text-xs sm:text-sm mt-8 opacity-75">
                 &copy; 2025 Trang Web Học Tiếng Anh. Dành cho các bé.
               </p>
+              {messageBox && <MessageBox message={messageBox.message} type={messageBox.type} onClose={closeMessageBox} />}
             </div>
           );
         }
