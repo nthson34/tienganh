@@ -11,6 +11,16 @@
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Expose Firebase objects globally for React to use
+        window.firebase = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, onSnapshot, deleteDoc };
+    </script>
+
 
     <!-- React and ReactDOM CDNs -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -31,24 +41,18 @@
 
       /* Keyframes for animations */
       @keyframes bounce-once {
-          0%, 100% {
-              transform: translateY(0);
-          }
-          50% {
-              transform: translateY(-10px);
-          }
+          0% { transform: translateY(0); }
+          20% { transform: translateY(-10px); }
+          40% { transform: translateY(0); }
+          60% { transform: translateY(-5px); }
+          80% { transform: translateY(0); }
+          100% { transform: translateY(0); }
       }
 
       @keyframes shake-once {
-          0%, 100% {
-              transform: translateX(0);
-          }
-          10%, 30%, 50%, 70%, 90% {
-              transform: translateX(-5px);
-          }
-          20%, 40%, 60%, 80% {
-              transform: translateX(5px);
-          }
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+          20%, 40%, 60%, 80% { transform: translateX(5px); }
       }
 
       /* Apply animations */
@@ -58,6 +62,34 @@
       .animate-shake-once {
           animation: shake-once 0.5s ease-in-out;
       }
+
+      /* Styles for drag and drop (Letter Scramble Game) */
+      .draggable-letter {
+        cursor: grab;
+        user-select: none; /* prevent text selection */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .draggable-letter:active {
+        cursor: grabbing;
+      }
+      .drop-zone {
+        border: 2px dashed #999; /* Darker dashed border for clarity */
+        background-color: #f0f4f8; /* Light blueish background for empty slots */
+        font-size: 2.5rem; /* Larger font size for _ */
+        color: #777; /* Gray color for _ */
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+      }
+      .drop-zone.hover {
+        background-color: #cfe2f3; /* Lighter blue on hover */
+        border-color: #63b3ed; /* Blue border on hover */
+      }
+      .drop-zone.filled {
+        border: 2px solid #66bb6a; /* Green border when filled */
+        background-color: #e6ffe6; /* Very light green when filled */
+        color: #1a202c; /* Dark text for readability */
+      }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 min-h-screen flex flex-col items-center justify-center p-4">
@@ -66,8 +98,11 @@
     <script type="text/babel">
         // Main App component for the interactive English learning website
         function App() {
-          const { useState, useEffect } = React;
+          // Destructure React hooks and Firebase global objects
+          const { useState, useEffect, useRef } = React;
+          const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, onSnapshot, deleteDoc } = window.firebase;
 
+          // Vocabulary data remains the same
           const vocabulary = [
             // Animals (10 words)
             { english: 'Cat', vietnamese: 'Mèo' },
@@ -208,25 +243,149 @@
           const [quizOptions, setQuizOptions] = useState([]);
           const [selectedAnswer, setSelectedAnswer] = useState(null);
           
-          const [score, setScore] = useState(() => {
-            const savedScore = localStorage.getItem('englishLearningScore');
-            return savedScore ? parseInt(savedScore, 10) : 0;
-          });
-          const [totalQuestions, setTotalQuestions] = useState(() => {
-            const savedTotal = localStorage.getItem('englishLearningTotal');
-            return savedTotal ? parseInt(savedTotal, 10) : 0;
-          });
+          // Firestore related states
+          const [db, setDb] = useState(null);
+          const [auth, setAuth] = useState(null);
+          const [userId, setUserId] = useState(null);
+          const [isAuthReady, setIsAuthReady] = useState(false);
+          const [isLoading, setIsLoading] = useState(true); // Initial loading state for Firebase
+
+          // Initialize score and totalQuestions from Firestore (default to 0)
+          const [score, setScore] = useState(0);
+          const [totalQuestions, setTotalQuestions] = useState(0);
+
+          // Achievement states - still using localStorage for simplicity
+          const [firstCorrectAchievement, setFirstCorrectAchievement] = useState(() =>
+            localStorage.getItem('firstCorrectAchievement') === 'true'
+          );
+          const [tenCorrectAchievement, setTenCorrectAchievement] = useState(() =>
+            localStorage.getItem('tenCorrectAchievement') === 'true'
+          );
 
           const [fillInBlanksInput, setFillInBlanksInput] = useState('');
           const [blankedWord, setBlankedWord] = useState('');
           const [fillInBlanksCorrect, setFillInBlanksCorrect] = useState(null);
 
+          // Matching Game states
+          const [matchingCards, setMatchingCards] = useState([]);
+          const [flippedCards, setFlippedCards] = useState([]); // Stores IDs of currently flipped cards
+          const [matchedPairs, setMatchedPairs] = useState(0); // Count of matched pairs
+          const [matchingGameComplete, setMatchingGameComplete] = useState(false);
+
+          // Letter Scramble Game states
+          const [scrambledLetters, setScrambledLetters] = useState([]); // Array of {id, letter} for drag & drop
+          const [targetSlots, setTargetSlots] = useState([]); // Array of {id, letter} for drop targets
+          const [draggedLetter, setDraggedLetter] = useState(null); // Stores the letter being dragged
+          const [scrambleCorrect, setScrambleCorrect] = useState(null); // Null, true, or false for correctness
+          const dragItem = useRef(null); // Ref for the item being dragged
+          const dragOverItem = useRef(null); // Ref for the item being dragged over
+
+
           const currentWord = shuffledVocabulary[currentShuffledIndex];
 
+          // --- Firebase Initialization and Auth Effect ---
           useEffect(() => {
-            localStorage.setItem('englishLearningScore', score.toString());
-            localStorage.setItem('englishLearningTotal', totalQuestions.toString());
-          }, [score, totalQuestions]);
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+            if (Object.keys(firebaseConfig).length === 0) {
+                console.error("Firebase config is missing or empty.");
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                const firestoreDb = getFirestore(app);
+                const firebaseAuth = getAuth(app);
+
+                setDb(firestoreDb);
+                setAuth(firebaseAuth);
+
+                // Listen for auth state changes
+                const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+                    if (user) {
+                        setUserId(user.uid);
+                    } else {
+                        // Sign in anonymously if no user is authenticated
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined') {
+                                await signInWithCustomToken(firebaseAuth, __initial_auth_token);
+                            } else {
+                                await signInAnonymously(firebaseAuth);
+                            }
+                        } catch (error) {
+                            console.error("Firebase Auth Error:", error);
+                        }
+                    }
+                    setIsAuthReady(true); // Auth state is ready after initial check or sign-in attempt
+                    setIsLoading(false); // Stop loading once auth is ready
+                });
+
+                return () => unsubscribe(); // Cleanup auth listener on unmount
+            } catch (error) {
+                console.error("Failed to initialize Firebase:", error);
+                setIsLoading(false);
+            }
+          }, []); // Run only once on component mount
+
+
+          // --- Firestore Data Listener and Updater ---
+          useEffect(() => {
+            if (!db || !userId || !isAuthReady) {
+                console.log("Firestore not ready or user not authenticated.");
+                return;
+            }
+
+            const userProgressDocRef = doc(db, `artifacts/${__app_id}/users/${userId}/learningProgress/userProgress`);
+
+            // Set up a real-time listener for user progress
+            const unsubscribe = onSnapshot(userProgressDocRef, (docSnap) => {
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                setScore(data.score || 0);
+                setTotalQuestions(data.totalQuestions || 0);
+              } else {
+                // Document doesn't exist, initialize with 0 if it's the first time
+                console.log("No progress found for this user, initializing.");
+                setScore(0);
+                setTotalQuestions(0);
+                // Optionally create the document with initial values right away
+                // setDoc(userProgressDocRef, { score: 0, totalQuestions: 0 }, { merge: true }).catch(e => console.error("Error setting initial doc:", e));
+              }
+            }, (error) => {
+                console.error("Error fetching Firestore progress:", error);
+            });
+
+            return () => unsubscribe(); // Cleanup listener on unmount
+          }, [db, userId, isAuthReady, __app_id]); // Dependencies: db, userId, isAuthReady
+
+
+          // --- Update Firestore on Score/TotalQuestions Change ---
+          useEffect(() => {
+            if (!db || !userId || !isAuthReady) {
+                return;
+            }
+            // Only update Firestore if score or totalQuestions has changed from initial load
+            // and if totalQuestions is not 0 (to avoid writing empty docs unnecessarily on init)
+            if (totalQuestions > 0 || score > 0) {
+                const userProgressDocRef = doc(db, `artifacts/${__app_id}/users/${userId}/learningProgress/userProgress`);
+                setDoc(userProgressDocRef, { score, totalQuestions }, { merge: true })
+                    .catch(e => console.error("Error updating Firestore progress:", e));
+            }
+            
+            // Achievement checks (still local for simplicity as per last request)
+            if (score >= 1 && !firstCorrectAchievement) {
+                setFirstCorrectAchievement(true);
+                localStorage.setItem('firstCorrectAchievement', 'true');
+                alert('🎉 Chúc mừng! Bạn đã có câu trả lời đúng đầu tiên!');
+            }
+            if (score >= 10 && !tenCorrectAchievement) {
+                setTenCorrectAchievement(true);
+                localStorage.setItem('tenCorrectAchievement', 'true');
+                alert('🏆 Tuyệt vời! Bạn đã có 10 câu trả lời đúng!');
+            }
+          }, [score, totalQuestions, db, userId, isAuthReady, firstCorrectAchievement, tenCorrectAchievement, __app_id]);
 
 
           const shuffleAndSetNewWord = () => {
@@ -269,10 +428,10 @@
             } else {
               console.warn('Trình duyệt này không hỗ trợ chức năng phát âm.');
             }
-            if (viewMode === 'game') {
+            if (viewMode === 'game' && shuffledVocabulary.length === 0) { // Only shuffle if not already shuffled
                 shuffleAndSetNewWord(); 
             }
-          }, [viewMode]);
+          }, [viewMode, shuffledVocabulary.length]);
 
 
           const generateMissingLettersWord = (word) => {
@@ -313,7 +472,151 @@
             setQuizOptions(options.sort(() => Math.random() - 0.5));
           };
 
+          // Matching Game Functions
+          const initializeMatchingGame = () => {
+            const pairs = [];
+            // Select 6 random words for the matching game (12 cards total)
+            const selectedWords = [];
+            const tempVocab = [...vocabulary];
+            while(selectedWords.length < 6 && tempVocab.length > 0) {
+                const randomIndex = Math.floor(Math.random() * tempVocab.length);
+                selectedWords.push(tempVocab.splice(randomIndex, 1)[0]);
+            }
 
+            selectedWords.forEach((word, index) => {
+              const uniqueId = `word-${index}`;
+              pairs.push({ id: `${uniqueId}-en`, value: word.english, type: 'english', isFlipped: false, isMatched: false, pairId: uniqueId });
+              pairs.push({ id: `${uniqueId}-vi`, value: word.vietnamese, type: 'vietnamese', isFlipped: false, isMatched: false, pairId: uniqueId });
+            });
+
+            // Shuffle cards
+            const shuffled = pairs.sort(() => Math.random() - 0.5);
+            setMatchingCards(shuffled);
+            setFlippedCards([]);
+            setMatchedPairs(0);
+            setMatchingGameComplete(false);
+          };
+
+          const handleMatchingCardClick = (clickedCard) => {
+            if (flippedCards.length === 2 || clickedCard.isFlipped || clickedCard.isMatched) {
+              return;
+            }
+
+            const newCards = matchingCards.map(card =>
+              card.id === clickedCard.id ? { ...card, isFlipped: true } : card
+            );
+            setMatchingCards(newCards);
+
+            const newFlipped = [...flippedCards, clickedCard];
+            setFlippedCards(newFlipped);
+
+            if (newFlipped.length === 2) {
+              const [card1, card2] = newFlipped;
+              if (card1.pairId === card2.pairId && card1.id !== card2.id) {
+                // Match found
+                setTimeout(() => {
+                  const updatedCards = newCards.map(card =>
+                    card.pairId === card1.pairId ? { ...card, isMatched: true } : card
+                  );
+                  setMatchingCards(updatedCards);
+                  setMatchedPairs(prev => prev + 1);
+                  setFlippedCards([]);
+                }, 800); // Keep cards flipped for a short duration
+                // Update global score, not game session score
+                setScore(prevScore => prevScore + 1); 
+                setTotalQuestions(prevTotal => prevTotal + 1); 
+              } else {
+                // No match
+                setTimeout(() => {
+                  const unflippedCards = newCards.map(card =>
+                    (card.id === card1.id || card.id === card2.id) ? { ...card, isFlipped: false } : card
+                  );
+                  setMatchingCards(unflippedCards);
+                  setFlippedCards([]);
+                }, 1000); // Flip back after a short duration
+                // Update global totalQuestions for attempts
+                setTotalQuestions(prevTotal => prevTotal + 1); 
+              }
+            }
+          };
+
+          useEffect(() => {
+            if (matchedPairs > 0 && matchedPairs * 2 === matchingCards.length && matchingCards.length > 0) {
+                setTimeout(() => {
+                    setMatchingGameComplete(true);
+                    alert('🎉 Chúc mừng! Bạn đã hoàn thành trò chơi ghép cặp!'); // Or a custom modal
+                }, 500);
+            }
+          }, [matchedPairs, matchingCards.length]);
+
+
+          // Letter Scramble Game Functions
+          const generateScrambledWord = (wordObject) => {
+            if (!wordObject) return;
+            const word = wordObject.english;
+            const letters = word.split('');
+            const scrambled = letters.sort(() => Math.random() - 0.5);
+
+            setScrambledLetters(scrambled.map((letter, index) => ({ id: `scrambled-${index}`, letter, originalIndex: index })));
+            setTargetSlots(Array(word.length).fill(null).map((_, index) => ({ id: `slot-${index}`, letter: null, originalIndex: index })));
+            setScrambleCorrect(null); // Reset correctness for new word
+          };
+
+          const handleDragStart = (e, letterData) => {
+            dragItem.current = letterData; // Store the entire letter object
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", letterData.letter); // For basic data transfer
+          };
+
+          const handleDragEnter = (e, slotId) => {
+            dragOverItem.current = slotId; // Store the slot ID
+          };
+
+          const handleDragOver = (e) => {
+            e.preventDefault(); // Necessary to allow dropping
+          };
+
+          const handleDrop = (e, targetSlotId) => {
+            e.preventDefault();
+            const draggedLetterData = dragItem.current;
+            const newTargetSlots = [...targetSlots];
+            const targetIndex = newTargetSlots.findIndex(slot => slot.id === targetSlotId);
+
+            // Remove letter from its original scrambled letters array (if it was there)
+            setScrambledLetters(prevLetters => prevLetters.filter(l => l.id !== draggedLetterData.id));
+
+            // If the target slot is already filled, move its current letter back to scrambledLetters
+            if (newTargetSlots[targetIndex].letter) {
+                setScrambledLetters(prevLetters => [...prevLetters, newTargetSlots[targetIndex].letter]);
+            }
+
+            // Place the dragged letter into the target slot
+            newTargetSlots[targetIndex] = { ...newTargetSlots[targetIndex], letter: draggedLetterData };
+            setTargetSlots(newTargetSlots);
+
+            dragItem.current = null;
+            dragOverItem.current = null;
+
+            // Check if all slots are filled to enable check button
+            const allSlotsFilled = newTargetSlots.every(slot => slot.letter !== null);
+            if (allSlotsFilled && scrambleCorrect === null) {
+                // Optionally auto-check or enable a check button
+            }
+          };
+
+          const handleScrambleCheck = () => {
+            if (!currentWord) return;
+            const formedWord = targetSlots.map(slot => slot.letter ? slot.letter.letter : '').join('');
+            if (formedWord.toLowerCase() === currentWord.english.toLowerCase()) {
+                setScrambleCorrect(true);
+                setScore(prevScore => prevScore + 1); // Update global score
+            } else {
+                setScrambleCorrect(false);
+            }
+            setTotalQuestions(prevTotal => prevTotal + 1); // Update global totalQuestions
+          };
+
+          // Unified effect for handling word changes within game modes (next/prev button clicks)
           useEffect(() => {
             if (viewMode !== 'game' || !currentWord) { 
                 return;
@@ -327,10 +630,18 @@
             } else if (gameMode === 'fill_in_blanks') {
                 console.log('Generating blanked word for:', currentWord.english);
                 setBlankedWord(generateMissingLettersWord(currentWord.english));
+            } else if (gameMode === 'matching_game') {
+                console.log('Initializing matching game');
+                initializeMatchingGame();
+            } else if (gameMode === 'letter_scramble') {
+                console.log('Generating scrambled word for:', currentWord.english);
+                generateScrambledWord(currentWord);
             }
+            // Reset game-specific states for the current session
             setSelectedAnswer(null);
             setFillInBlanksInput('');
             setFillInBlanksCorrect(null);
+            setScrambleCorrect(null);
           }, [currentShuffledIndex, gameMode, currentWord, viewMode]);
 
 
@@ -364,9 +675,9 @@
 
             setSelectedAnswer(answer);
             if (answer.toLowerCase() === currentWord.english.toLowerCase()) {
-              setScore(prevScore => prevScore + 1);
+              setScore(prevScore => prevScore + 1); // Update global score
             }
-            setTotalQuestions(prevTotal => prevTotal + 1);
+            setTotalQuestions(prevTotal => prevTotal + 1); // Update global totalQuestions
           };
 
           const handleFillInBlanksInput = (event) => {
@@ -378,19 +689,17 @@
 
             if (fillInBlanksInput.toLowerCase() === currentWord.english.toLowerCase()) {
               setFillInBlanksCorrect(true);
-              setScore(prevScore => prevScore + 1);
+              setScore(prevScore => prevScore + 1); // Update global score
             } else {
               setFillInBlanksCorrect(false);
             }
-            setTotalQuestions(prevTotal => totalQuestions + 1);
+            setTotalQuestions(prevTotal => totalQuestions + 1); // Update global totalQuestions
           };
 
           const resetGame = () => {
-            setScore(0);
-            setTotalQuestions(0);
-            localStorage.setItem('englishLearningScore', '0'); 
-            localStorage.setItem('englishLearningTotal', '0'); 
-
+            // This reset is only for the *current game session's display*, not global progress
+            // Do NOT reset score/totalQuestions states here as they are managed by Firestore listener
+            
             const newWord = shuffleAndSetNewWord();
             
             if (newWord) {
@@ -398,11 +707,17 @@
                     generateGameOptionsForWord(newWord);
                 } else if (gameMode === 'fill_in_blanks') {
                     setBlankedWord(generateMissingLettersWord(newWord.english));
+                } else if (gameMode === 'matching_game') {
+                    initializeMatchingGame();
+                } else if (gameMode === 'letter_scramble') {
+                    generateScrambledWord(newWord);
                 }
             }
             setSelectedAnswer(null);
             setFillInBlanksInput('');
             setFillInBlanksCorrect(null);
+            setMatchingGameComplete(false);
+            setScrambleCorrect(null);
           };
 
           const nextGameQuestion = () => {
@@ -412,12 +727,13 @@
           const changeGameMode = (mode) => {
             console.log("Changing game mode to:", mode);
             setGameMode(mode);
-            setScore(0); 
-            setTotalQuestions(0); 
+            // Do NOT reset global score/totalQuestions here, only game-specific session states
             setSelectedAnswer(null);
             setFillInBlanksInput('');
             setBlankedWord('');
             setFillInBlanksCorrect(null);
+            setMatchingGameComplete(false);
+            setScrambleCorrect(null);
 
             const newCurrentWord = shuffleAndSetNewWord();
 
@@ -428,24 +744,56 @@
                 } else if (mode === 'fill_in_blanks') {
                     console.log('Setting up fill-in-blanks for word:', newCurrentWord.english);
                     setBlankedWord(generateMissingLettersWord(newCurrentWord.english));
+                } else if (mode === 'matching_game') {
+                    console.log('Setting up matching game');
+                    initializeMatchingGame(); // Always initialize matching game fresh
+                } else if (mode === 'letter_scramble') {
+                    console.log('Setting up letter scramble for word:', newCurrentWord.english);
+                    generateScrambledWord(newCurrentWord);
                 }
             } else {
                 console.error("Failed to get a new current word after shuffling in changeGameMode for mode:", mode);
             }
           };
 
-          const resetAllProgress = () => {
-            setScore(0);
-            setTotalQuestions(0);
-            localStorage.setItem('englishLearningScore', '0');
-            localStorage.setItem('englishLearningTotal', '0');
-            // Using alert for simplicity; consider a custom modal for better UX
-            alert('Tiến độ học tập đã được đặt lại!'); 
+          const resetAllProgress = async () => {
+            if (!db || !userId) {
+                alert('Firebase chưa sẵn sàng. Vui lòng thử lại sau.');
+                return;
+            }
+            try {
+                const userProgressDocRef = doc(db, `artifacts/${__app_id}/users/${userId}/learningProgress/userProgress`);
+                await deleteDoc(userProgressDocRef);
+                
+                // Also reset achievement flags in local storage
+                setFirstCorrectAchievement(false);
+                localStorage.setItem('firstCorrectAchievement', 'false');
+                setTenCorrectAchievement(false);
+                localStorage.setItem('tenCorrectAchievement', 'false');
+
+                alert('Tiến độ học tập và thành tích đã được đặt lại trên Cloud!');
+                // Score/totalQuestions states will be reset by the onSnapshot listener after deletion
+            } catch (error) {
+                console.error("Error resetting progress in Firestore:", error);
+                alert('Có lỗi xảy ra khi đặt lại tiến độ. Vui lòng thử lại.');
+            }
           };
 
-          const progressPercentage = (shuffledVocabulary.length > 0)
+          const progressPercentage = (shuffledVocabulary.length > 0 && gameMode !== 'matching_game')
             ? ((currentShuffledIndex + 1) / shuffledVocabulary.length) * 100
             : 0;
+
+          // Display loading message if Firebase is still initializing
+          if (isLoading) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4">
+                <div className="text-white text-3xl font-bold animate-pulse">
+                  Đang tải... Vui lòng chờ <i className="fas fa-spinner fa-spin ml-2"></i>
+                </div>
+              </div>
+            );
+          }
+
 
           return (
             <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4 md:p-8 lg:p-12 font-inter text-gray-800">
@@ -504,10 +852,24 @@
                     >
                       Viết Từ Còn Thiếu
                     </button>
+                    <button
+                      onClick={() => changeGameMode('matching_game')}
+                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                        ${gameMode === 'matching_game' ? 'bg-yellow-600 text-white ring-2 ring-yellow-300' : 'bg-yellow-500 text-white hover:bg-yellow-600'}`}
+                    >
+                      Ghép Cặp
+                    </button>
+                    <button
+                      onClick={() => changeGameMode('letter_scramble')}
+                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                        ${gameMode === 'letter_scramble' ? 'bg-orange-600 text-white ring-2 ring-orange-300' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+                    >
+                      Sắp Xếp Chữ Cái
+                    </button>
                   </div>
 
                   {/* Progress Bar for Games */}
-                  {(shuffledVocabulary.length > 0) && (
+                  {(shuffledVocabulary.length > 0 && gameMode !== 'matching_game') && ( // Progress bar not applicable to matching game
                     <div className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg bg-gray-200 rounded-full h-3 mb-6 overflow-hidden shadow-inner">
                       <div
                         className="bg-gradient-to-r from-yellow-400 to-green-500 h-full rounded-full transition-all duration-500 ease-out"
@@ -729,6 +1091,149 @@
                             <i className="fas fa-redo mr-2"></i> Chơi lại Viết Từ Còn Thiếu
                           </button>
                         </div>
+                      ) : gameMode === 'matching_game' ? (
+                        // Matching Game UI
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-full lg:max-w-4xl flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-yellow-200">
+                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                            Ghép Cặp Từ
+                          </h2>
+                          {matchingGameComplete ? (
+                                <div className="text-center text-green-700 text-3xl font-bold mb-6 animate-bounce-once">
+                                    Bạn thật tuyệt vời! Bạn đã ghép đúng tất cả các cặp! 🎉
+                                    <button
+                                      onClick={resetGame}
+                                      className="mt-6 px-6 py-3 rounded-full font-semibold text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                                    >
+                                        <i className="fas fa-redo mr-2"></i> Chơi lại Ghép Cặp
+                                    </button>
+                                </div>
+                          ) : (
+                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 w-full max-w-4xl mb-6">
+                                {matchingCards.map(card => (
+                                  <div
+                                    key={card.id}
+                                    className={`relative w-full aspect-square rounded-xl shadow-lg flex items-center justify-center cursor-pointer transition-all duration-300 transform hover:scale-105
+                                      ${card.isFlipped || card.isMatched ? 'bg-gradient-to-br from-blue-100 to-purple-100' : 'bg-gray-200 hover:bg-gray-300'}`}
+                                    onClick={() => handleMatchingCardClick(card)}
+                                  >
+                                    <div className={`absolute inset-0 flex items-center justify-center text-center p-2 font-semibold text-lg sm:text-xl md:text-2xl
+                                      ${card.isFlipped || card.isMatched ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300
+                                      ${card.isMatched ? 'text-green-700' : 'text-gray-800'}`}>
+                                      {card.value}
+                                    </div>
+                                    {/* Back of the card */}
+                                    <div className={`absolute inset-0 flex items-center justify-center text-center p-2 rounded-xl bg-gradient-to-br from-indigo-400 to-pink-400 text-white font-bold text-2xl sm:text-3xl md:text-4xl transform transition-all duration-300
+                                      ${card.isFlipped || card.isMatched ? 'rotate-y-180 opacity-0' : 'rotate-y-0 opacity-100'}`}>
+                                      <i className="fas fa-question text-white"></i>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                          )}
+                          <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                            Số cặp đã ghép: {matchedPairs} / {matchingCards.length / 2}
+                          </p>
+                          {!matchingGameComplete && (
+                            <button
+                                onClick={resetGame}
+                                className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                            >
+                                <i className="fas fa-redo mr-2"></i> Chơi lại Ghép Cặp
+                            </button>
+                          )}
+                        </div>
+                      ) : gameMode === 'letter_scramble' ? (
+                        // Letter Scramble Game UI
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-orange-200">
+                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                            Sắp Xếp Chữ Cái
+                          </h2>
+
+                          <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 mb-4 select-none italic text-center px-2">
+                            "{currentWord.vietnamese}"
+                          </p>
+
+                          {/* Draggable Letters */}
+                          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6 p-3 bg-blue-50 rounded-lg shadow-inner">
+                            {scrambledLetters.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className="draggable-letter px-4 py-2 bg-blue-400 text-white font-bold text-xl sm:text-2xl rounded-lg shadow-md transition-all duration-200 hover:bg-blue-500 transform hover:scale-105"
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, item)}
+                                    onTouchStart={(e) => handleDragStart(e, item)}
+                                >
+                                    {item.letter.toUpperCase()}
+                                </div>
+                            ))}
+                          </div>
+
+                          {/* Drop Zones (Target Slots) */}
+                          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6">
+                            {targetSlots.map((slot, index) => (
+                                <div
+                                    key={slot.id}
+                                    className={`drop-zone w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center rounded-lg text-2xl sm:text-3xl font-bold
+                                        ${slot.letter ? 'bg-green-100 border-green-500 filled' : ''} ${draggedLetter && dragOverItem.current === slot.id ? 'hover' : ''}`
+                                    }
+                                    onDragEnter={(e) => handleDragEnter(e, slot.id)}
+                                    onDragLeave={() => dragOverItem.current = null}
+                                    onDragOver={handleDragOver}
+                                    onDrop={(e) => handleDrop(e, slot.id)}
+                                    onTouchEnd={(e) => handleDrop(e, slot.id)}
+                                >
+                                    {slot.letter ? slot.letter.letter.toUpperCase() : '_'}
+                                </div>
+                            ))}
+                          </div>
+
+                          <button
+                            onClick={handleScrambleCheck}
+                            disabled={scrambleCorrect !== null || targetSlots.some(slot => slot.letter === null)} // Disable if already checked or not all slots filled
+                            className={`px-8 py-4 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 mb-6
+                              ${scrambleCorrect === null && targetSlots.every(slot => slot.letter !== null)
+                                ? 'bg-purple-500 hover:bg-purple-600 text-white'
+                                : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
+                              }`}
+                          >
+                            <i className="fas fa-check-circle mr-2"></i> Kiểm tra
+                          </button>
+
+                          {scrambleCorrect !== null && (
+                            <div className="mt-4 text-center flex flex-col items-center">
+                              {scrambleCorrect ? (
+                                <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
+                              ) : (
+                                <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                                    Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
+                                </p>
+                              )}
+                              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                                <button
+                                  onClick={speakWord}
+                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                                >
+                                  <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
+                                </button>
+                                <button
+                                  onClick={nextGameQuestion}
+                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                                >
+                                  Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                           <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                            Điểm: {score} / {totalQuestions}
+                          </p>
+                           <button
+                            onClick={resetGame}
+                            className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                          >
+                            <i className="fas fa-redo mr-2"></i> Chơi lại Sắp Xếp Chữ Cái
+                          </button>
+                        </div>
                       ) : (
                         // Flashcard Mode UI
                         <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-indigo-200">
@@ -811,7 +1316,24 @@
                       </p>
                     )}
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+                  <h3 className="text-2xl font-bold text-gray-700 mt-8 mb-4">Thành tích của bạn</h3>
+                  <div className="w-full flex flex-col items-center gap-3">
+                    <div className={`w-full p-3 rounded-lg shadow-md flex items-center justify-between text-lg md:text-xl font-semibold
+                      ${firstCorrectAchievement ? 'bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500' : 'bg-gray-100 text-gray-500'}`}>
+                      <span>
+                        <i className={`fas fa-star mr-2 ${firstCorrectAchievement ? 'text-yellow-500' : 'text-gray-400'}`}></i> Câu trả lời đúng đầu tiên
+                      </span>
+                      {firstCorrectAchievement && <i className="fas fa-check-circle text-green-500 ml-2"></i>}
+                    </div>
+                    <div className={`w-full p-3 rounded-lg shadow-md flex items-center justify-between text-lg md:text-xl font-semibold
+                      ${tenCorrectAchievement ? 'bg-purple-100 text-purple-800 border-l-4 border-purple-500' : 'bg-gray-100 text-gray-500'}`}>
+                      <span>
+                        <i className={`fas fa-medal mr-2 ${tenCorrectAchievement ? 'text-purple-500' : 'text-gray-400'}`}></i> 10 câu trả lời đúng
+                      </span>
+                      {tenCorrectAchievement && <i className="fas fa-check-circle text-green-500 ml-2"></i>}
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-4 w-full justify-center mt-8">
                     <button
                       onClick={resetAllProgress}
                       className="px-6 py-3 rounded-full font-semibold text-lg bg-red-500 text-white shadow-lg hover:bg-red-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
@@ -825,6 +1347,12 @@
                       <i className="fas fa-play-circle mr-2"></i> Quay Lại Trò Chơi
                     </button>
                   </div>
+                  {/* Display user ID for debugging/multi-user identification */}
+                  {userId && (
+                    <p className="text-gray-600 text-sm mt-4 text-center break-all">
+                      ID Người dùng: <span className="font-mono text-gray-800">{userId}</span>
+                    </p>
+                  )}
                 </div>
               )}
 
