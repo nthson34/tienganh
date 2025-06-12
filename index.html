@@ -14,11 +14,11 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Expose Firebase objects globally for React to use
-        window.firebase = { initializeApp, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, getFirestore, doc, setDoc, onSnapshot, deleteDoc };
+        window.firebase = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signOut, getFirestore, doc, setDoc, onSnapshot, deleteDoc };
     </script>
 
 
@@ -106,16 +106,15 @@
                 authDomain: "tienganh-b5c92.firebaseapp.com",
                 projectId: "tienganh-b5c92",
                 storageBucket: "tienganh-b5c92.firebasestorage.app",
-                messagingSenderId: "1097712667266",
                 appId: "1:1097712667266:web:6c2ac844975f6a8a99429b",
-                measurementId: "G-K6FNDEE49T"
+                measurementId: "G-K6FNDEE49T" // Removed messagingSenderId as it's not strictly necessary for this use case
               });
 
         // Main App component for the interactive English learning website
         function App() {
           // Destructure React hooks and Firebase global objects
           const { useState, useEffect, useRef } = React;
-          const { initializeApp, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, getFirestore, doc, setDoc, onSnapshot, deleteDoc } = window.firebase;
+          const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signOut, getFirestore, doc, setDoc, onSnapshot, deleteDoc } = window.firebase;
 
           // --- Message Box Component ---
           const MessageBox = ({ message, type, onClose }) => {
@@ -294,17 +293,16 @@
           const [quizOptions, setQuizOptions] = useState([]);
           const [selectedAnswer, setSelectedAnswer] = useState(null);
           
-          // Firestore related states
+          // Firebase related states
           const [db, setDb] = useState(null);
           const [auth, setAuth] = useState(null);
-          const [userId, setUserId] = useState(null); // UID of the authenticated user
-          const [currentUser, setCurrentUser] = useState(null); // Full user object from Firebase Auth
+          const [firebaseUser, setFirebaseUser] = useState(null); // The actual Firebase Auth user (anonymous)
+          const [activePasscode, setActivePasscode] = useState(null); // The passcode entered by the user
           const [isLoading, setIsLoading] = useState(true); // Initial loading state for Firebase auth and data
 
-          // Auth form states
-          const [email, setEmail] = useState('');
-          const [password, setPassword] = useState('');
-          const [authError, setAuthError] = useState('');
+          // Passcode input state
+          const [passcodeInput, setPasscodeInput] = useState('');
+          const [passcodeError, setPasscodeError] = useState('');
 
           // Initialize score and totalQuestions from Firestore (default to 0)
           const [score, setScore] = useState(0);
@@ -341,7 +339,6 @@
 
           // --- Firebase Initialization and Auth Effect ---
           useEffect(() => {
-            // Using window.__app_id and window.__firebase_config directly now
             const appId = window.__app_id; 
             const firebaseConfig = JSON.parse(window.__firebase_config);
 
@@ -359,16 +356,37 @@
                 setDb(firestoreDb);
                 setAuth(firebaseAuth);
 
-                // Listen for auth state changes
-                const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
-                    setCurrentUser(user);
-                    setUserId(user ? user.uid : null);
-                    setIsLoading(false); // Auth state is ready after initial check
+                // Listen for Firebase Auth state changes (primarily for anonymous user)
+                const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+                    setFirebaseUser(user); // Set the Firebase Auth user object
+
+                    // Attempt to sign in anonymously if no user is present
+                    if (!user) {
+                        try {
+                            await signInAnonymously(firebaseAuth);
+                            console.log("Signed in anonymously.");
+                        } catch (error) {
+                            console.error("Firebase Anonymous Auth Error:", error);
+                            showMessageBox(`Lỗi đăng nhập ẩn danh: ${error.message}`, 'error');
+                        }
+                    }
+                    setIsLoading(false); // Auth state check is complete
                 });
+
+                // Try to load last active passcode from localStorage
+                const storedPasscode = localStorage.getItem('lastPasscode');
+                if (storedPasscode) {
+                    setActivePasscode(storedPasscode);
+                    setPasscodeInput(storedPasscode); // Set input field to the stored passcode
+                } else {
+                    setIsLoading(false); // If no stored passcode, no need to wait for firebase user
+                }
+
 
                 return () => unsubscribe(); // Cleanup auth listener on unmount
             } catch (error) {
                 console.error("Failed to initialize Firebase:", error);
+                showMessageBox(`Lỗi khởi tạo Firebase: ${error.message}`, 'error');
                 setIsLoading(false);
             }
           }, []); // Run only once on component mount
@@ -376,14 +394,16 @@
 
           // --- Firestore Data Listener and Updater ---
           useEffect(() => {
-            if (!db || !userId || !currentUser) { // Only listen if authenticated user exists
-                // Reset progress states if user logs out or isn't logged in
+            // Only listen if Firestore is ready, an anonymous Firebase user exists, AND an active passcode is set
+            if (!db || !firebaseUser || !activePasscode) {
+                // If any of these are missing, reset progress states as no valid profile is loaded
                 setScore(0);
                 setTotalQuestions(0);
                 return;
             }
 
-            const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/users/${userId}/learningProgress/userProgress`);
+            // Document path is now based on the activePasscode
+            const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/profiles/${activePasscode}/learningProgress/userProgress`);
 
             // Set up a real-time listener for user progress
             const unsubscribe = onSnapshot(userProgressDocRef, (docSnap) => {
@@ -392,7 +412,8 @@
                 setScore(data.score || 0);
                 setTotalQuestions(data.totalQuestions || 0);
               } else {
-                // Document doesn't exist, initialize with 0
+                // Document doesn't exist for this passcode, initialize with 0
+                console.log(`No progress found for passcode ${activePasscode}, initializing.`);
                 setScore(0);
                 setTotalQuestions(0);
                 // Create the document with initial values if it doesn't exist
@@ -405,18 +426,19 @@
             });
 
             return () => unsubscribe(); // Cleanup listener on unmount
-          }, [db, userId, currentUser, window.__app_id]); // Dependencies: db, userId, currentUser
+          }, [db, firebaseUser, activePasscode, window.__app_id]); // Dependencies: db, firebaseUser, activePasscode
 
 
           // --- Update Firestore on Score/TotalQuestions Change ---
           useEffect(() => {
-            if (!db || !userId || !currentUser) {
+            // Only update Firestore if Firebase is ready, an anonymous user is logged in, and a passcode is active
+            if (!db || !firebaseUser || !activePasscode) {
                 return;
             }
-            // Only update Firestore if score or totalQuestions has changed from initial load
-            // and if totalQuestions is not 0 (to avoid writing empty docs unnecessarily on init)
-            if (totalQuestions > 0 || score > 0) { // Only write if there's actual progress
-                const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/users/${userId}/learningProgress/userProgress`);
+            
+            // Only write if there's actual progress being recorded
+            if (totalQuestions > 0 || score > 0) {
+                const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/profiles/${activePasscode}/learningProgress/userProgress`);
                 setDoc(userProgressDocRef, { score, totalQuestions }, { merge: true })
                     .catch(e => {
                         console.error("Error updating Firestore progress:", e);
@@ -435,7 +457,7 @@
                 localStorage.setItem('tenCorrectAchievement', 'true');
                 showMessageBox('🏆 Tuyệt vời! Bạn đã có 10 câu trả lời đúng!', 'success');
             }
-          }, [score, totalQuestions, db, userId, currentUser, firstCorrectAchievement, tenCorrectAchievement, window.__app_id]);
+          }, [score, totalQuestions, db, firebaseUser, activePasscode, firstCorrectAchievement, tenCorrectAchievement, window.__app_id]);
 
 
           const shuffleAndSetNewWord = () => {
@@ -479,10 +501,10 @@
               console.warn('Trình duyệt này không hỗ trợ chức năng phát âm.');
             }
             // Only shuffle if in game view and vocabulary isn't already shuffled
-            if (viewMode === 'game' && shuffledVocabulary.length === 0) { 
+            if (activePasscode && viewMode === 'game' && shuffledVocabulary.length === 0) { 
                 shuffleAndSetNewWord(); 
             }
-          }, [viewMode, shuffledVocabulary.length]);
+          }, [viewMode, shuffledVocabulary.length, activePasscode]);
 
 
           const generateMissingLettersWord = (word) => {
@@ -732,8 +754,7 @@
           };
 
           const handleFillInBlanksInput = (event) => {
-            // setEmail(event.target.value); // This was incorrectly mapping to email for auth form
-            setFillInBlanksInput(event.target.value); // Used for fill in blanks game
+            setFillInBlanksInput(event.target.value); 
           };
 
           const handleFillInBlanksSubmit = () => {
@@ -809,12 +830,13 @@
           };
 
           const resetAllProgress = async () => {
-            if (!db || !userId) {
-                showMessageBox('Firebase chưa sẵn sàng hoặc bạn chưa đăng nhập.', 'error');
+            if (!db || !activePasscode || !firebaseUser) {
+                showMessageBox('Firebase chưa sẵn sàng hoặc bạn chưa đăng nhập với passcode.', 'error');
                 return;
             }
             try {
-                const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/users/${userId}/learningProgress/userProgress`);
+                // Delete data for the active passcode
+                const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/profiles/${activePasscode}/learningProgress/userProgress`);
                 await deleteDoc(userProgressDocRef);
                 
                 // Also reset achievement flags in local storage
@@ -835,99 +857,72 @@
             ? ((currentShuffledIndex + 1) / shuffledVocabulary.length) * 100
             : 0;
 
-          // --- Firebase Auth Handlers ---
-          const handleSignUp = async () => {
-            setAuthError('');
-            try {
-              await createUserWithEmailAndPassword(auth, email, password);
-              // User will be automatically signed in, onAuthStateChanged will handle state update
-              showMessageBox('Đăng ký thành công! Bạn đã được đăng nhập.', 'success');
-            } catch (error) {
-              setAuthError(error.message);
-              console.error("Error during sign up:", error);
-              showMessageBox(`Lỗi đăng ký: ${error.message}`, 'error');
+          // --- Passcode Auth Handlers ---
+          const handlePasscodeLogin = () => {
+            setPasscodeError('');
+            if (!passcodeInput.trim()) {
+              setPasscodeError('Vui lòng nhập passcode.');
+              return;
             }
+            localStorage.setItem('lastPasscode', passcodeInput.trim()); // Save passcode for next time
+            setActivePasscode(passcodeInput.trim()); // Set active passcode for data loading
+            showMessageBox(`Chào mừng, ${passcodeInput.trim()}! Đang tải tiến độ của bạn.`, 'success');
           };
 
-          const handleSignIn = async () => {
-            setAuthError('');
-            try {
-              await signInWithEmailAndPassword(auth, email, password);
-              // User will be automatically signed in, onAuthStateChanged will handle state update
-              showMessageBox('Đăng nhập thành công!', 'success');
-            } catch (error) {
-              setAuthError(error.message);
-              console.error("Error during sign in:", error);
-              showMessageBox(`Lỗi đăng nhập: ${error.message}`, 'error');
-            }
-          };
-
-          const handleSignOut = async () => {
-            setAuthError('');
-            try {
-              await signOut(auth);
-              // currentUser and userId will be nullified by onAuthStateChanged listener
-              setEmail('');
-              setPassword('');
-              showMessageBox('Bạn đã đăng xuất.', 'info');
-            } catch (error) {
-              setAuthError(error.message);
-              console.error("Error during sign out:", error);
-              showMessageBox(`Lỗi đăng xuất: ${error.message}`, 'error');
+          const handlePasscodeSignOut = async () => {
+            setPasscodeError('');
+            localStorage.removeItem('lastPasscode'); // Clear saved passcode
+            setActivePasscode(null); // Clear active passcode
+            setPasscodeInput(''); // Clear input field
+            setScore(0); // Reset local score display
+            setTotalQuestions(0); // Reset local total display
+            showMessageBox('Bạn đã đăng xuất khỏi passcode hiện tại.', 'info');
+            // Optionally, sign out anonymous Firebase user too for a full reset
+            if (auth && firebaseUser) {
+              try {
+                await signOut(auth);
+                console.log("Signed out anonymous Firebase user.");
+              } catch (error) {
+                console.error("Error signing out anonymous user:", error);
+              }
             }
           };
 
 
-          // Display loading message if Firebase is still initializing
-          if (isLoading) {
-            return (
-              <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4">
-                <div className="text-white text-3xl font-bold animate-pulse">
-                  Đang tải... Vui lòng chờ <i className="fas fa-spinner fa-spin ml-2"></i>
-                </div>
-              </div>
-            );
-          }
-
-          // Show login/signup form if no user is authenticated
-          if (!currentUser) {
+          // Display loading message if Firebase is still initializing or no passcode is active
+          if (isLoading || !activePasscode) {
             return (
               <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4">
                 <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md flex flex-col items-center border-4 border-blue-200">
                   <h2 className="text-3xl md:text-4xl font-bold text-gray-700 mb-6 text-center">
                     Chào mừng bạn!
                   </h2>
-                  <p className="text-lg text-gray-600 mb-4 text-center">Đăng nhập hoặc đăng ký để bắt đầu học nhé!</p>
+                  <p className="text-lg text-gray-600 mb-4 text-center">Nhập passcode của bạn để bắt đầu học nhé:</p>
                   
                   <input
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 mb-4 border-2 border-blue-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 shadow-sm"
+                    type="text"
+                    placeholder="Nhập passcode của bạn"
+                    value={passcodeInput}
+                    onChange={(e) => setPasscodeInput(e.target.value)}
+                    onKeyPress={(e) => { // Allow pressing Enter to login
+                        if (e.key === 'Enter') {
+                            handlePasscodeLogin();
+                        }
+                    }}
+                    className="w-full px-4 py-3 mb-4 border-2 border-blue-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 shadow-sm text-center"
                   />
-                  <input
-                    type="password"
-                    placeholder="Mật khẩu"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3 mb-6 border-2 border-blue-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 shadow-sm"
-                  />
-                  {authError && (
-                    <p className="text-red-500 text-sm mb-4 text-center">{authError}</p>
+                  {passcodeError && (
+                    <p className="text-red-500 text-sm mb-4 text-center">{passcodeError}</p>
                   )}
                   <button
-                    onClick={handleSignIn}
+                    onClick={handlePasscodeLogin}
                     className="w-full px-6 py-3 rounded-full font-bold text-lg bg-green-500 text-white shadow-lg hover:bg-green-600 transition-all duration-200 transform hover:scale-105 active:scale-95 mb-3"
                   >
-                    <i className="fas fa-sign-in-alt mr-2"></i> Đăng nhập
+                    <i className="fas fa-play-circle mr-2"></i> Bắt đầu học
                   </button>
-                  <button
-                    onClick={handleSignUp}
-                    className="w-full px-6 py-3 rounded-full font-bold text-lg bg-purple-500 text-white shadow-lg hover:bg-purple-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                  >
-                    <i className="fas fa-user-plus mr-2"></i> Đăng ký
-                  </button>
+                  <p className="text-sm text-gray-500 mt-2 text-center">
+                    (Mỗi passcode sẽ có tiến độ học tập riêng được lưu trên Cloud)
+                  </p>
                 </div>
                 {messageBox && <MessageBox message={messageBox.message} type={messageBox.type} onClose={closeMessageBox} />}
               </div>
@@ -959,10 +954,10 @@
                   <i className="fas fa-chart-line mr-2"></i> Xem Tiến Độ
                 </button>
                 <button
-                  onClick={handleSignOut}
+                  onClick={handlePasscodeSignOut}
                   className="flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-lg sm:text-xl shadow-xl transition-all duration-300 transform hover:scale-105 bg-gray-500 text-white hover:bg-gray-600 hover:shadow-2xl"
                 >
-                  <i className="fas fa-sign-out-alt mr-2"></i> Đăng xuất
+                  <i className="fas fa-sign-out-alt mr-2"></i> Đăng xuất Passcode
                 </button>
               </div>
 
@@ -1411,7 +1406,7 @@
                           <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 md:space-x-6 w-full justify-center">
                             <button
                               onClick={prevWord}
-                              className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-yellow-500 hover:bg-yellow-500 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <i className="fas fa-arrow-left mr-2"></i> Trước
                             </button>
@@ -1493,15 +1488,10 @@
                       <i className="fas fa-play-circle mr-2"></i> Quay Lại Trò Chơi
                     </button>
                   </div>
-                  {/* Display user ID for debugging/multi-user identification */}
-                  {userId && (
+                  {/* Display active passcode for user to identify */}
+                  {activePasscode && (
                     <p className="text-gray-600 text-sm mt-4 text-center break-all">
-                      ID Người dùng: <span className="font-mono text-gray-800">{userId}</span>
-                    </p>
-                  )}
-                  {currentUser && (
-                    <p className="text-gray-600 text-sm mt-2 text-center">
-                      Email đăng nhập: <span className="font-mono text-gray-800">{currentUser.email}</span>
+                      Passcode hiện tại: <span className="font-mono text-gray-800">{activePasscode}</span>
                     </p>
                   )}
                 </div>
