@@ -116,43 +116,6 @@
           const { useState, useEffect, useRef } = React;
           const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signOut, getFirestore, doc, setDoc, onSnapshot, deleteDoc } = window.firebase;
 
-          // --- Message Box Component ---
-          const MessageBox = ({ message, type, onClose }) => {
-              const bgColor = type === 'success' ? 'bg-green-100 border-green-400 text-green-700' :
-                              type === 'error' ? 'bg-red-100 border-red-400 text-red-700' :
-                              'bg-blue-100 border-blue-400 text-blue-700';
-              const icon = type === 'success' ? 'fas fa-check-circle' :
-                           type === 'error' ? 'fas fa-times-circle' :
-                           'fas fa-info-circle';
-
-              return (
-                  <div className={`fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4`}>
-                      <div className={`relative ${bgColor} border rounded-lg shadow-xl p-6 max-w-sm w-full text-center`}>
-                          <div className="flex items-center justify-center mb-4">
-                              <i className={`${icon} text-3xl mr-3`}></i>
-                              <p className="font-semibold text-lg">{message}</p>
-                          </div>
-                          <button
-                              onClick={onClose}
-                              className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition duration-200 shadow-md"
-                          >
-                              Đóng
-                          </button>
-                      </div>
-                  </div>
-              );
-          };
-
-          const [messageBox, setMessageBox] = useState(null); // { message, type }
-
-          const showMessageBox = (message, type = 'info') => {
-              setMessageBox({ message, type });
-          };
-
-          const closeMessageBox = () => {
-              setMessageBox(null);
-          };
-
           const vocabulary = [
             // Animals (10 words)
             { english: 'Cat', vietnamese: 'Mèo' },
@@ -367,7 +330,6 @@
                             console.log("Signed in anonymously.");
                         } catch (error) {
                             console.error("Firebase Anonymous Auth Error:", error);
-                            showMessageBox(`Lỗi đăng nhập ẩn danh: ${error.message}`, 'error');
                         }
                     }
                     setIsLoading(false); // Auth state check is complete
@@ -386,7 +348,6 @@
                 return () => unsubscribe(); // Cleanup auth listener on unmount
             } catch (error) {
                 console.error("Failed to initialize Firebase:", error);
-                showMessageBox(`Lỗi khởi tạo Firebase: ${error.message}`, 'error');
                 setIsLoading(false);
             }
           }, []); // Run only once on component mount
@@ -422,7 +383,6 @@
               }
             }, (error) => {
                 console.error("Error fetching Firestore progress:", error);
-                showMessageBox(`Lỗi khi tải tiến độ: ${error.message}`, 'error');
             });
 
             return () => unsubscribe(); // Cleanup listener on unmount
@@ -442,7 +402,6 @@
                 setDoc(userProgressDocRef, { score, totalQuestions }, { merge: true })
                     .catch(e => {
                         console.error("Error updating Firestore progress:", e);
-                        showMessageBox(`Lỗi khi lưu tiến độ: ${e.message}`, 'error');
                     });
             }
             
@@ -450,12 +409,12 @@
             if (score >= 1 && !firstCorrectAchievement) {
                 setFirstCorrectAchievement(true);
                 localStorage.setItem('firstCorrectAchievement', 'true');
-                showMessageBox('🎉 Chúc mừng! Bạn đã có câu trả lời đúng đầu tiên!', 'success');
+                // No alert, just log if needed: console.log('🎉 Chúc mừng! Bạn đã có câu trả lời đúng đầu tiên!');
             }
             if (score >= 10 && !tenCorrectAchievement) {
                 setTenCorrectAchievement(true);
                 localStorage.setItem('tenCorrectAchievement', 'true');
-                showMessageBox('🏆 Tuyệt vời! Bạn đã có 10 câu trả lời đúng!', 'success');
+                // No alert, just log if needed: console.log('🏆 Tuyệt vời! Bạn đã có 10 câu trả lời đúng!');
             }
           }, [score, totalQuestions, db, firebaseUser, activePasscode, firstCorrectAchievement, tenCorrectAchievement, window.__app_id]);
 
@@ -617,7 +576,7 @@
             if (matchedPairs > 0 && matchedPairs * 2 === matchingCards.length && matchingCards.length > 0) {
                 setTimeout(() => {
                     setMatchingGameComplete(true);
-                    showMessageBox('🎉 Chúc mừng! Bạn đã hoàn thành trò chơi ghép cặp!', 'success');
+                    // No alert, just log if needed: console.log('🎉 Chúc mừng! Bạn đã hoàn thành trò chơi ghép cặp!');
                 }, 500);
             }
           }, [matchedPairs, matchingCards.length]);
@@ -831,7 +790,7 @@
 
           const resetAllProgress = async () => {
             if (!db || !activePasscode || !firebaseUser) {
-                showMessageBox('Firebase chưa sẵn sàng hoặc bạn chưa đăng nhập với passcode.', 'error');
+                console.error('Firebase is not ready or you are not logged in with a passcode.');
                 return;
             }
             try {
@@ -845,11 +804,11 @@
                 setTenCorrectAchievement(false);
                 localStorage.setItem('tenCorrectAchievement', 'false');
 
-                showMessageBox('Tiến độ học tập và thành tích đã được đặt lại trên Cloud!', 'success');
+                console.log('Learning progress and achievements have been reset on Cloud!');
                 // Score/totalQuestions states will be reset by the onSnapshot listener after deletion
-            } catch (error) {
+            }
+            catch (error) {
                 console.error("Error resetting progress in Firestore:", error);
-                showMessageBox(`Có lỗi xảy ra khi đặt lại tiến độ: ${error.message}`, 'error');
             }
           };
 
@@ -866,7 +825,7 @@
             }
             localStorage.setItem('lastPasscode', passcodeInput.trim()); // Save passcode for next time
             setActivePasscode(passcodeInput.trim()); // Set active passcode for data loading
-            showMessageBox(`Chào mừng, ${passcodeInput.trim()}! Đang tải tiến độ của bạn.`, 'success');
+            console.log(`Welcome, ${passcodeInput.trim()}! Loading your progress.`);
           };
 
           const handlePasscodeSignOut = async () => {
@@ -876,7 +835,7 @@
             setPasscodeInput(''); // Clear input field
             setScore(0); // Reset local score display
             setTotalQuestions(0); // Reset local total display
-            showMessageBox('Bạn đã đăng xuất khỏi passcode hiện tại.', 'info');
+            console.log('You have signed out of the current passcode.');
             // Optionally, sign out anonymous Firebase user too for a full reset
             if (auth && firebaseUser) {
               try {
@@ -924,7 +883,6 @@
                     (Mỗi passcode sẽ có tiến độ học tập riêng được lưu trên Cloud)
                   </p>
                 </div>
-                {messageBox && <MessageBox message={messageBox.message} type={messageBox.type} onClose={closeMessageBox} />}
               </div>
             );
           }
@@ -1283,98 +1241,6 @@
                             </button>
                           )}
                         </div>
-                      ) : gameMode === 'letter_scramble' ? (
-                        // Letter Scramble Game UI
-                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-orange-200">
-                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
-                            Sắp Xếp Chữ Cái
-                          </h2>
-
-                          <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 mb-4 select-none italic text-center px-2">
-                            "{currentWord.vietnamese}"
-                          </p>
-
-                          {/* Draggable Letters */}
-                          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6 p-3 bg-blue-50 rounded-lg shadow-inner">
-                            {scrambledLetters.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className="draggable-letter px-4 py-2 bg-blue-400 text-white font-bold text-xl sm:text-2xl rounded-lg shadow-md transition-all duration-200 hover:bg-blue-500 transform hover:scale-105"
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, item)}
-                                    onTouchStart={(e) => handleDragStart(e, item)}
-                                >
-                                    {item.letter.toUpperCase()}
-                                </div>
-                            ))}
-                          </div>
-
-                          {/* Drop Zones (Target Slots) */}
-                          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6">
-                            {targetSlots.map((slot, index) => (
-                                <div
-                                    key={slot.id}
-                                    className={`drop-zone w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center rounded-lg text-2xl sm:text-3xl font-bold
-                                        ${slot.letter ? 'bg-green-100 border-green-500 filled' : ''} ${draggedLetter && dragOverItem.current === slot.id ? 'hover' : ''}`
-                                    }
-                                    onDragEnter={(e) => handleDragEnter(e, slot.id)}
-                                    onDragLeave={() => dragOverItem.current = null}
-                                    onDragOver={handleDragOver}
-                                    onDrop={(e) => handleDrop(e, slot.id)}
-                                    onTouchEnd={(e) => handleDrop(e, slot.id)}
-                                >
-                                    {slot.letter ? slot.letter.letter.toUpperCase() : '_'}
-                                </div>
-                            ))}
-                          </div>
-
-                          <button
-                            onClick={handleScrambleCheck}
-                            disabled={scrambleCorrect !== null || targetSlots.some(slot => slot.letter === null)} // Disable if already checked or not all slots filled
-                            className={`px-8 py-4 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 mb-6
-                              ${scrambleCorrect === null && targetSlots.every(slot => slot.letter !== null)
-                                ? 'bg-purple-500 hover:bg-purple-600 text-white'
-                                : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
-                              }`}
-                          >
-                            <i className="fas fa-check-circle mr-2"></i> Kiểm tra
-                          </button>
-
-                          {scrambleCorrect !== null && (
-                            <div className="mt-4 text-center flex flex-col items-center">
-                              {scrambleCorrect ? (
-                                <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
-                              ) : (
-                                <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
-                                    Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
-                                </p>
-                              )}
-                              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                                <button
-                                  onClick={speakWord}
-                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                >
-                                  <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
-                                </button>
-                                <button
-                                  onClick={nextGameQuestion}
-                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                >
-                                  Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                           <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
-                            Điểm: {score} / {totalQuestions}
-                          </p>
-                           <button
-                            onClick={resetGame}
-                            className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                          >
-                            <i className="fas fa-redo mr-2"></i> Chơi lại Sắp Xếp Chữ Cái
-                          </button>
-                        </div>
                       ) : (
                         // Flashcard Mode UI
                         <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-indigo-200">
@@ -1500,7 +1366,6 @@
               <p className="text-gray-700 text-xs sm:text-sm mt-8 opacity-75">
                 &copy; 2025 Trang Web Học Tiếng Anh. Dành cho các bé.
               </p>
-              {messageBox && <MessageBox message={messageBox.message} type={messageBox.type} onClose={closeMessageBox} />}
             </div>
           );
         }
