@@ -14,11 +14,11 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Expose Firebase objects globally for React to use
-        window.firebase = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, onSnapshot, deleteDoc };
+        window.firebase = { initializeApp, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, getFirestore, doc, setDoc, onSnapshot, deleteDoc };
     </script>
 
 
@@ -100,7 +100,7 @@
         function App() {
           // Destructure React hooks and Firebase global objects
           const { useState, useEffect, useRef } = React;
-          const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, onSnapshot, deleteDoc } = window.firebase;
+          const { initializeApp, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, getFirestore, doc, setDoc, onSnapshot, deleteDoc } = window.firebase;
 
           // Vocabulary data remains the same
           const vocabulary = [
@@ -246,9 +246,14 @@
           // Firestore related states
           const [db, setDb] = useState(null);
           const [auth, setAuth] = useState(null);
-          const [userId, setUserId] = useState(null);
-          const [isAuthReady, setIsAuthReady] = useState(false);
-          const [isLoading, setIsLoading] = useState(true); // Initial loading state for Firebase
+          const [userId, setUserId] = useState(null); // UID of the authenticated user
+          const [currentUser, setCurrentUser] = useState(null); // Full user object from Firebase Auth
+          const [isLoading, setIsLoading] = useState(true); // Initial loading state for Firebase auth and data
+
+          // Auth form states
+          const [email, setEmail] = useState('');
+          const [password, setPassword] = useState('');
+          const [authError, setAuthError] = useState('');
 
           // Initialize score and totalQuestions from Firestore (default to 0)
           const [score, setScore] = useState(0);
@@ -303,23 +308,10 @@
                 setAuth(firebaseAuth);
 
                 // Listen for auth state changes
-                const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
-                    if (user) {
-                        setUserId(user.uid);
-                    } else {
-                        // Sign in anonymously if no user is authenticated
-                        try {
-                            if (typeof __initial_auth_token !== 'undefined') {
-                                await signInWithCustomToken(firebaseAuth, __initial_auth_token);
-                            } else {
-                                await signInAnonymously(firebaseAuth);
-                            }
-                        } catch (error) {
-                            console.error("Firebase Auth Error:", error);
-                        }
-                    }
-                    setIsAuthReady(true); // Auth state is ready after initial check or sign-in attempt
-                    setIsLoading(false); // Stop loading once auth is ready
+                const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+                    setCurrentUser(user);
+                    setUserId(user ? user.uid : null);
+                    setIsLoading(false); // Auth state is ready after initial check
                 });
 
                 return () => unsubscribe(); // Cleanup auth listener on unmount
@@ -332,8 +324,10 @@
 
           // --- Firestore Data Listener and Updater ---
           useEffect(() => {
-            if (!db || !userId || !isAuthReady) {
-                console.log("Firestore not ready or user not authenticated.");
+            if (!db || !userId || !currentUser) { // Only listen if authenticated user exists
+                // Reset progress states if user logs out or isn't logged in
+                setScore(0);
+                setTotalQuestions(0);
                 return;
             }
 
@@ -346,29 +340,29 @@
                 setScore(data.score || 0);
                 setTotalQuestions(data.totalQuestions || 0);
               } else {
-                // Document doesn't exist, initialize with 0 if it's the first time
-                console.log("No progress found for this user, initializing.");
+                // Document doesn't exist, initialize with 0
                 setScore(0);
                 setTotalQuestions(0);
-                // Optionally create the document with initial values right away
-                // setDoc(userProgressDocRef, { score: 0, totalQuestions: 0 }, { merge: true }).catch(e => console.error("Error setting initial doc:", e));
+                // Create the document with initial values if it doesn't exist
+                setDoc(userProgressDocRef, { score: 0, totalQuestions: 0 }, { merge: true })
+                    .catch(e => console.error("Error setting initial doc:", e));
               }
             }, (error) => {
                 console.error("Error fetching Firestore progress:", error);
             });
 
             return () => unsubscribe(); // Cleanup listener on unmount
-          }, [db, userId, isAuthReady, __app_id]); // Dependencies: db, userId, isAuthReady
+          }, [db, userId, currentUser, __app_id]); // Dependencies: db, userId, currentUser
 
 
           // --- Update Firestore on Score/TotalQuestions Change ---
           useEffect(() => {
-            if (!db || !userId || !isAuthReady) {
+            if (!db || !userId || !currentUser) {
                 return;
             }
             // Only update Firestore if score or totalQuestions has changed from initial load
             // and if totalQuestions is not 0 (to avoid writing empty docs unnecessarily on init)
-            if (totalQuestions > 0 || score > 0) {
+            if (totalQuestions > 0 || score > 0) { // Only write if there's actual progress
                 const userProgressDocRef = doc(db, `artifacts/${__app_id}/users/${userId}/learningProgress/userProgress`);
                 setDoc(userProgressDocRef, { score, totalQuestions }, { merge: true })
                     .catch(e => console.error("Error updating Firestore progress:", e));
@@ -385,7 +379,7 @@
                 localStorage.setItem('tenCorrectAchievement', 'true');
                 alert('🏆 Tuyệt vời! Bạn đã có 10 câu trả lời đúng!');
             }
-          }, [score, totalQuestions, db, userId, isAuthReady, firstCorrectAchievement, tenCorrectAchievement, __app_id]);
+          }, [score, totalQuestions, db, userId, currentUser, firstCorrectAchievement, tenCorrectAchievement, __app_id]);
 
 
           const shuffleAndSetNewWord = () => {
@@ -428,7 +422,8 @@
             } else {
               console.warn('Trình duyệt này không hỗ trợ chức năng phát âm.');
             }
-            if (viewMode === 'game' && shuffledVocabulary.length === 0) { // Only shuffle if not already shuffled
+            // Only shuffle if in game view and vocabulary isn't already shuffled
+            if (viewMode === 'game' && shuffledVocabulary.length === 0) { 
                 shuffleAndSetNewWord(); 
             }
           }, [viewMode, shuffledVocabulary.length]);
@@ -681,7 +676,8 @@
           };
 
           const handleFillInBlanksInput = (event) => {
-            setFillInBlanksInput(event.target.value);
+            setEmail(event.target.value); // Used for email in auth form
+            setFillInBlanksInput(event.target.value); // Used for fill in blanks game
           };
 
           const handleFillInBlanksSubmit = () => {
@@ -758,7 +754,7 @@
 
           const resetAllProgress = async () => {
             if (!db || !userId) {
-                alert('Firebase chưa sẵn sàng. Vui lòng thử lại sau.');
+                alert('Firebase chưa sẵn sàng hoặc bạn chưa đăng nhập.');
                 return;
             }
             try {
@@ -783,12 +779,96 @@
             ? ((currentShuffledIndex + 1) / shuffledVocabulary.length) * 100
             : 0;
 
+          // --- Firebase Auth Handlers ---
+          const handleSignUp = async () => {
+            setAuthError('');
+            try {
+              await createUserWithEmailAndPassword(auth, email, password);
+              // User will be automatically signed in, onAuthStateChanged will handle state update
+              alert('Đăng ký thành công! Bạn đã được đăng nhập.');
+            } catch (error) {
+              setAuthError(error.message);
+              console.error("Error during sign up:", error);
+            }
+          };
+
+          const handleSignIn = async () => {
+            setAuthError('');
+            try {
+              await signInWithEmailAndPassword(auth, email, password);
+              // User will be automatically signed in, onAuthStateChanged will handle state update
+              alert('Đăng nhập thành công!');
+            } catch (error) {
+              setAuthError(error.message);
+              console.error("Error during sign in:", error);
+            }
+          };
+
+          const handleSignOut = async () => {
+            setAuthError('');
+            try {
+              await signOut(auth);
+              // currentUser and userId will be nullified by onAuthStateChanged listener
+              setEmail('');
+              setPassword('');
+              alert('Bạn đã đăng xuất.');
+            } catch (error) {
+              setAuthError(error.message);
+              console.error("Error during sign out:", error);
+            }
+          };
+
+
           // Display loading message if Firebase is still initializing
           if (isLoading) {
             return (
               <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4">
                 <div className="text-white text-3xl font-bold animate-pulse">
                   Đang tải... Vui lòng chờ <i className="fas fa-spinner fa-spin ml-2"></i>
+                </div>
+              </div>
+            );
+          }
+
+          // Show login/signup form if no user is authenticated
+          if (!currentUser) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4">
+                <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md flex flex-col items-center border-4 border-blue-200">
+                  <h2 className="text-3xl md:text-4xl font-bold text-gray-700 mb-6 text-center">
+                    Chào mừng bạn!
+                  </h2>
+                  <p className="text-lg text-gray-600 mb-4 text-center">Đăng nhập hoặc đăng ký để bắt đầu học nhé!</p>
+                  
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-3 mb-4 border-2 border-blue-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 shadow-sm"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 mb-6 border-2 border-blue-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 shadow-sm"
+                  />
+                  {authError && (
+                    <p className="text-red-500 text-sm mb-4 text-center">{authError}</p>
+                  )}
+                  <button
+                    onClick={handleSignIn}
+                    className="w-full px-6 py-3 rounded-full font-bold text-lg bg-green-500 text-white shadow-lg hover:bg-green-600 transition-all duration-200 transform hover:scale-105 active:scale-95 mb-3"
+                  >
+                    <i className="fas fa-sign-in-alt mr-2"></i> Đăng nhập
+                  </button>
+                  <button
+                    onClick={handleSignUp}
+                    className="w-full px-6 py-3 rounded-full font-bold text-lg bg-purple-500 text-white shadow-lg hover:bg-purple-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                  >
+                    <i className="fas fa-user-plus mr-2"></i> Đăng ký
+                  </button>
                 </div>
               </div>
             );
@@ -817,6 +897,12 @@
                     ${viewMode === 'progress' ? 'bg-gradient-to-r from-green-600 to-green-800 text-white ring-4 ring-green-300' : 'bg-green-500 text-white hover:bg-green-600 hover:shadow-2xl'}`}
                 >
                   <i className="fas fa-chart-line mr-2"></i> Xem Tiến Độ
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-lg sm:text-xl shadow-xl transition-all duration-300 transform hover:scale-105 bg-gray-500 text-white hover:bg-gray-600 hover:shadow-2xl"
+                >
+                  <i className="fas fa-sign-out-alt mr-2"></i> Đăng xuất
                 </button>
               </div>
 
@@ -1037,7 +1123,7 @@
                           <input
                             type="text"
                             value={fillInBlanksInput}
-                            onChange={handleFillInBlanksInput}
+                            onChange={(e) => setFillInBlanksInput(e.target.value)}
                             disabled={fillInBlanksCorrect !== null}
                             className="w-full max-w-xs md:max-w-sm lg:max-w-md px-4 py-3 mb-6 border-2 border-orange-400 rounded-lg text-xl md:text-2xl text-center focus:outline-none focus:ring-2 focus:ring-orange-500 transition duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed shadow-md"
                             placeholder="Nhập từ tiếng Anh..."
@@ -1351,6 +1437,11 @@
                   {userId && (
                     <p className="text-gray-600 text-sm mt-4 text-center break-all">
                       ID Người dùng: <span className="font-mono text-gray-800">{userId}</span>
+                    </p>
+                  )}
+                  {currentUser && (
+                    <p className="text-gray-600 text-sm mt-2 text-center">
+                      Email đăng nhập: <span className="font-mono text-gray-800">{currentUser.email}</span>
                     </p>
                   )}
                 </div>
