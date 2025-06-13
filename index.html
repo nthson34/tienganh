@@ -105,7 +105,7 @@
         // Ví dụ: const firebaseConfig = { apiKey: "...", authDomain: "...", projectId: "...", ... };
 
         // Dòng này phải là project ID của dự án Firebase của BẠN
-        window.__app_id = "YOUR_PROJECT_ID_HERE"; // VÍ DỤ: "your-project-12345"
+        window.__app_id = "tienganh-b5c92"; // VÍ DỤ: "your-project-12345"
 
         // Dòng này phải chứa toàn bộ đối tượng JSON của cấu hình Firebase của BẠN
         window.__firebase_config = JSON.stringify({
@@ -122,6 +122,12 @@
 
         // Main App component for the interactive English learning website
         function App() {
+          // Destructure React hooks directly from React (global object provided by CDN)
+          // This fixes "useState is not defined" error
+          const useState = React.useState;
+          const useEffect = React.useEffect;
+          const useRef = React.useRef;
+
           const vocabulary = [
             // Animals (10 words)
             { english: 'Cat', vietnamese: 'Mèo' },
