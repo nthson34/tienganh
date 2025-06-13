@@ -69,6 +69,7 @@
         justify-content: center;
         cursor: grab; /* Indicate draggable */
         user-select: none; /* Prevent text selection during drag */
+        touch-action: none; /* Prevent default touch scrolling/zooming */
       }
       .draggable-letter:active {
         cursor: grabbing;
@@ -309,6 +310,7 @@
           const [scrambleCorrect, setScrambleCorrect] = useState(null);
           const [draggedLetterData, setDraggedLetterData] = useState(null); // The letter object being dragged
           const [dragSource, setDragSource] = useState(null); // 'pool' or 'slot-X'
+          const [currentDragOverElement, setCurrentDragOverElement] = useState(null); // For touch drag visual feedback
 
 
           const currentWord = shuffledVocabulary[currentShuffledIndex];
@@ -651,13 +653,18 @@
             setScrambleCorrect(null); // Reset correctness for new word
             setDraggedLetterData(null); // Reset dragged letter
             setDragSource(null); // Reset drag source
+            setCurrentDragOverElement(null); // Reset drag over element
           };
 
           const handleDragStart = (e, letterData, source) => {
+            // Set data for native drag-and-drop API
             e.dataTransfer.setData("letterId", letterData.id); 
+            e.dataTransfer.effectAllowed = 'move';
+            
+            // Set states for React logic and visual feedback
             setDraggedLetterData(letterData);
             setDragSource(source);
-            e.dataTransfer.effectAllowed = 'move';
+            setScrambleCorrect(null); // Reset correctness feedback
             e.currentTarget.classList.add('is-dragging'); // Add visual feedback
           };
 
@@ -665,29 +672,37 @@
             e.preventDefault(); // Necessary to allow drop
             e.dataTransfer.dropEffect = 'move';
             e.currentTarget.classList.add('drag-over'); // Add visual feedback for drop zone
+            setCurrentDragOverElement(e.currentTarget); // Track current element being dragged over
           };
 
           const handleDragLeave = (e) => {
             e.currentTarget.classList.remove('drag-over'); // Remove visual feedback when leaving
+            setCurrentDragOverElement(null);
           };
 
-          const handleDrop = (e, targetLocation, targetIndex = null) => {
-            e.preventDefault();
-            e.currentTarget.classList.remove('drag-over'); // Remove visual feedback on drop
+          // Unified drop logic for both native drag and touch emulation
+          const handleDrop = (e, targetLocation, targetIndex = null, droppedLetter = null, sourceOrigin = null) => {
+            if (e) { // If it's a native drag event, prevent default
+                e.preventDefault();
+                e.currentTarget.classList.remove('drag-over');
+                setCurrentDragOverElement(null);
+            }
 
-            if (!draggedLetterData) return; // No letter being dragged
+            const letterToDrop = droppedLetter || draggedLetterData;
+            const currentOrigin = sourceOrigin || dragSource;
+
+            if (!letterToDrop) return; // No letter being dragged/dropped
 
             let newTargetSlots = [...targetSlots];
             let newScrambledLetters = [...scrambledLetters];
             
-            const letterToDrop = draggedLetterData;
             const currentLetterInTargetSlot = (targetLocation === 'slot' && targetIndex !== null) ? newTargetSlots[targetIndex].letter : null;
 
             // Step 1: Remove letter from its original source
-            if (dragSource === 'pool') {
+            if (currentOrigin === 'pool') {
                 newScrambledLetters = newScrambledLetters.filter(l => l.id !== letterToDrop.id);
-            } else if (dragSource.startsWith('slot-')) {
-                const sourceSlotIndex = parseInt(dragSource.split('-')[1]);
+            } else if (currentOrigin && currentOrigin.startsWith('slot-')) {
+                const sourceSlotIndex = parseInt(currentOrigin.split('-')[1]);
                 if (targetLocation === 'slot' && sourceSlotIndex === targetIndex) {
                     // Dropping onto the same slot it came from, do nothing to source
                 } else {
@@ -697,7 +712,10 @@
 
             // Step 2: Place letter into new target or return to pool
             if (targetLocation === 'pool') {
-                newScrambledLetters.push(letterToDrop);
+                // Ensure it's not already in the pool to prevent duplicates if dragged from slot to slot
+                if (!newScrambledLetters.some(l => l.id === letterToDrop.id)) {
+                    newScrambledLetters.push(letterToDrop);
+                }
             } else if (targetLocation === 'slot' && targetIndex !== null) {
                 // If target slot was filled, move its current letter back to the pool
                 if (currentLetterInTargetSlot) {
@@ -716,12 +734,116 @@
             setScrambleCorrect(null); // Clear correctness feedback
           };
 
-          const handleGlobalDragEnd = (e) => {
-            // This is useful if the drag ends outside of a valid drop zone or any drop zone
+          // Touch events emulation for drag-and-drop
+          const touchDragStartTimeout = useRef(null); // To differentiate tap from drag
+          const touchStartingPoint = useRef({ x: 0, y: 0 }); // To track initial touch position
+
+          const handleTouchStart = (e, letterData, source) => {
+            e.preventDefault(); // Prevent scrolling and other default touch behaviors immediately
+
+            // Store starting touch position
+            touchStartingPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+
+            // Use a timeout to determine if it's a drag or a tap
+            touchDragStartTimeout.current = setTimeout(() => {
+                // If touch hasn't moved much, it's a tap, don't start drag
+                startDrag(letterData, source); // Set states for React logic and visual feedback
+                e.currentTarget.classList.add('is-dragging'); // Add visual feedback
+            }, 100); // Small delay to allow for taps vs. drags
+          };
+
+          const handleTouchMove = (e) => {
+            e.preventDefault(); // Prevent scrolling
+            if (!draggedLetterData) return; // Only process if a drag has officially started
+
+            const clientX = e.touches[0].clientX;
+            const clientY = e.touches[0].clientY;
+
+            // Find element under touch
+            const elementUnderTouch = document.elementFromPoint(clientX, clientY);
+            
+            // Remove 'drag-over' from previously highlighted element
+            if (currentDragOverElement && currentDragOverElement !== elementUnderTouch) {
+                currentDragOverElement.classList.remove('drag-over');
+            }
+
+            // Add 'drag-over' to new target if it's a drop-zone
+            if (elementUnderTouch && (elementUnderTouch.classList.contains('drop-zone') || elementUnderTouch.closest('.flex-wrap.justify-center.gap-2.sm\\:gap-3.mb-6.p-3.bg-blue-50.rounded-lg.shadow-inner'))) {
+                elementUnderTouch.classList.add('drag-over');
+                setCurrentDragOverElement(elementUnderTouch);
+            } else {
+                setCurrentDragOverElement(null);
+            }
+          };
+
+          const handleTouchEnd = (e) => {
+            e.preventDefault();
+            clearTimeout(touchDragStartTimeout.current); // Clear any pending drag start timeout
+
+            const clientX = e.changedTouches[0].clientX;
+            const clientY = e.changedTouches[0].clientY;
+
+            const finalDropElement = document.elementFromPoint(clientX, clientY);
+
+            // Clean up all 'is-dragging' and 'drag-over' classes globally
             const draggingElements = document.querySelectorAll('.is-dragging');
             draggingElements.forEach(el => el.classList.remove('is-dragging'));
             const dragOverElements = document.querySelectorAll('.drag-over');
             dragOverElements.forEach(el => el.classList.remove('drag-over'));
+            setCurrentDragOverElement(null); // Clear state for visual feedback
+
+            if (!draggedLetterData) {
+                // If no letter was being actively dragged (e.g., it was just a tap)
+                return;
+            }
+
+            // Determine drop target (slot or pool)
+            let dropTargetLocation = null;
+            let dropTargetIndex = null;
+
+            if (finalDropElement) {
+                if (finalDropElement.classList.contains('drop-zone')) {
+                    dropTargetLocation = 'slot';
+                    const slotId = finalDropElement.id; // Assuming drop-zone has an id like 'slot-X'
+                    dropTargetIndex = parseInt(slotId.replace('slot-', ''));
+                } else if (finalDropElement.closest('.flex-wrap.justify-center.gap-2.sm\\:gap-3.mb-6.p-3.bg-blue-50.rounded-lg.shadow-inner')) {
+                    // This is the letter pool div
+                    dropTargetLocation = 'pool';
+                }
+            }
+
+            // Execute drop logic or return letter to source if no valid target
+            if (dropTargetLocation) {
+                handleDrop(null, dropTargetLocation, dropTargetIndex, draggedLetterData, dragSource);
+            } else {
+                // If dropped nowhere, return the dragged letter to its original source
+                let newTargetSlots = [...targetSlots];
+                let newScrambledLetters = [...scrambledLetters];
+
+                if (dragSource === 'pool') {
+                    newScrambledLetters.push(draggedLetterData);
+                    newScrambledLetters.sort((a,b) => a.originalIndex - b.originalIndex);
+                } else if (dragSource.startsWith('slot-')) {
+                    const sourceSlotIndex = parseInt(dragSource.split('-')[1]);
+                    newTargetSlots[sourceSlotIndex] = { ...newTargetSlots[sourceSlotIndex], letter: draggedLetterData };
+                }
+                setTargetSlots(newTargetSlots);
+                setScrambledLetters(newScrambledLetters);
+            }
+
+            // Reset drag states after processing touch end
+            setDraggedLetterData(null);
+            setDragSource(null);
+            setScrambleCorrect(null);
+          };
+
+          // Native dragend event listener (for when drag ends outside any drop target)
+          const handleGlobalDragEnd = (e) => {
+            const draggingElements = document.querySelectorAll('.is-dragging');
+            draggingElements.forEach(el => el.classList.remove('is-dragging'));
+            const dragOverElements = document.querySelectorAll('.drag-over');
+            dragOverElements.forEach(el => el.classList.remove('drag-over'));
+            setCurrentDragOverElement(null);
             setDraggedLetterData(null);
             setDragSource(null);
           };
@@ -787,6 +909,7 @@
             setScrambleCorrect(null);
             setDraggedLetterData(null); // Ensure no letter is selected/dragged from previous round
             setDragSource(null);
+            setCurrentDragOverElement(null);
           }, [currentShuffledIndex, gameMode, currentWord, viewMode]);
 
 
@@ -885,6 +1008,7 @@
             setScrambleCorrect(null);
             setDraggedLetterData(null); // Ensure no selected letter on reset
             setDragSource(null);
+            setCurrentDragOverElement(null);
           };
 
           const nextGameQuestion = () => {
@@ -903,6 +1027,7 @@
             setScrambleCorrect(null);
             setDraggedLetterData(null); // Reset dragged letter when changing mode
             setDragSource(null);
+            setCurrentDragOverElement(null);
 
             const newCurrentWord = shuffleAndSetNewWord();
 
@@ -1411,16 +1536,18 @@
                           <div 
                               className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6 p-3 bg-blue-50 rounded-lg shadow-inner w-full min-h-[70px]"
                               onDragOver={handleDragOver}
-                              onDrop={(e) => handleDrop(e, 'pool')} // Drop target for returning letters to pool
+                              onDrop={(e) => handleDrop(e, 'pool')}
+                              onTouchMove={handleTouchMove} 
+                              onTouchEnd={handleTouchEnd} 
                           >
                             {scrambledLetters.map((item) => (
                                 <div
                                     key={item.id}
                                     draggable="true"
                                     onDragStart={(e) => handleDragStart(e, item, 'pool')}
+                                    onTouchStart={(e) => handleTouchStart(e, item, 'pool')} 
                                     className={`draggable-letter px-4 py-2 bg-blue-400 text-white font-bold text-xl sm:text-2xl rounded-lg shadow-md transition-all duration-200 hover:bg-blue-500 transform hover:scale-105
-                                        ${draggedLetterData && draggedLetterData.id === item.id ? 'is-dragging' : ''}` // Visual feedback for dragging
-                                    }
+                                        ${draggedLetterData && draggedLetterData.id === item.id ? 'is-dragging' : ''}`}
                                 >
                                     {item.letter.toUpperCase()}
                                 </div>
@@ -1438,18 +1565,20 @@
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, 'slot', index)}
                                     onDragLeave={handleDragLeave}
+                                    onTouchMove={handleTouchMove} 
+                                    onTouchEnd={handleTouchEnd} 
                                     className={`drop-zone w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center rounded-lg text-2xl sm:text-3xl font-bold
                                         ${slot.letter ? 'bg-green-100 border-green-500 filled' : ''} 
-                                        ${e => e.currentTarget.classList.contains('drag-over') ? 'drag-over' : ''}` // Ensure drag-over class based on event
+                                        ${currentDragOverElement && currentDragOverElement.id === slot.id ? 'drag-over' : ''}` // Uses currentDragOverElement state for consistency
                                     }
                                 >
                                     {slot.letter ? (
                                         <div 
                                             draggable="true"
                                             onDragStart={(e) => handleDragStart(e, slot.letter, `slot-${index}`)}
+                                            onTouchStart={(e) => handleTouchStart(e, slot.letter, `slot-${index}`)} 
                                             className={`draggable-letter w-full h-full flex items-center justify-center
-                                                ${draggedLetterData && draggedLetterData.id === slot.letter.id ? 'is-dragging' : ''}` // Visual feedback for dragging
-                                            }
+                                                ${draggedLetterData && draggedLetterData.id === slot.letter.id ? 'is-dragging' : ''}`}
                                         >
                                             {slot.letter.letter.toUpperCase()}
                                         </div>
