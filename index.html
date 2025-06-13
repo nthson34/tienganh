@@ -1,1621 +1,1546 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Học Tiếng Anh Thật Vui!</title>
-    <!-- Tailwind CSS CDN for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inter Font from Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+import React, { useState, useEffect, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getFirestore, doc, setDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// Define __app_id and __firebase_config globally for consistent access
+// These values will be overridden by the Canvas environment if present
+// but provide a fallback for direct browser execution.
+window.__app_id = typeof window.__app_id !== 'undefined' ? window.__app_id : "tienganh-b5c92";
+window.__firebase_config = typeof window.__firebase_config !== 'undefined'
+    ? window.__firebase_config
+    : JSON.stringify({
+        apiKey: "AIzaSyC5FTPfRIvLKhcGN6jDKEMXGx0eT_PoGfQ",
+        authDomain: "tienganh-b5c92.firebaseapp.com",
+        projectId: "tienganh-b5c92",
+        storageBucket: "tienganh-b5c92.firebasestorage.app",
+        messagingSenderId: "1097712667266", 
+        appId: "1:1097712667266:web:6c2ac844975f6a8a99429b",
+        measurementId: "G-K6FNDEE49T"
+      });
 
-        // Expose Firebase objects globally for React to use
-        window.firebase = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signOut, getFirestore, doc, setDoc, onSnapshot, deleteDoc };
-    </script>
+// Main App component for the interactive English learning website
+function App() {
+  const vocabulary = [
+    // Animals (10 words)
+    { english: 'Cat', vietnamese: 'Mèo' },
+    { english: 'Dog', vietnamese: 'Chó' },
+    { english: 'Bird', vietnamese: 'Chim' },
+    { english: 'Fish', vietnamese: 'Cá' },
+    { english: 'Lion', vietnamese: 'Sư tử' },
+    { english: 'Elephant', vietnamese: 'Voi' },
+    { english: 'Monkey', vietnamese: 'Khỉ' },
+    { english: 'Bear', vietnamese: 'Gấu' },
+    { english: 'Rabbit', vietnamese: 'Thỏ' },
+    { english: 'Tiger', vietnamese: 'Hổ' },
+    // Fruits (10 words)
+    { english: 'Apple', vietnamese: 'Quả táo' },
+    { english: 'Banana', vietnamese: 'Quả chuối' },
+    { english: 'Orange', vietnamese: 'Quả cam' },
+    { english: 'Grape', vietnamese: 'Quả nho' },
+    { english: 'Strawberry', vietnamese: 'Dâu tây' },
+    { english: 'Mango', vietnamese: 'Xoài' },
+    { english: 'Pineapple', vietnamese: 'Dứa' },
+    { english: 'Watermelon', vietnamese: 'Dưa hấu' },
+    { english: 'Cherry', vietnamese: 'Anh đào' },
+    { english: 'Kiwi', vietnamese: 'Kiwi' },
+    // Vegetables (10 words)
+    { english: 'Carrot', vietnamese: 'Cà rốt' },
+    { english: 'Tomato', vietnamese: 'Cà chua' },
+    { english: 'Potato', vietnamese: 'Khoai tây' },
+    { english: 'Broccoli', vietnamese: 'Bông cải xanh' },
+    { english: 'Onion', vietnamese: 'Hành tây' },
+    { english: 'Cucumber', vietnamese: 'Dưa chuột' },
+    { english: 'Pepper', vietnamese: 'Ớt chuông' },
+    { english: 'Cabbage', vietnamese: 'Bắp cải' },
+    { english: 'Corn', vietnamese: 'Ngô' },
+    { english: 'Lettuce', vietnamese: 'Xà lách' },
+    // Family (10 words)
+    { english: 'Mother', vietnamese: 'Mẹ' },
+    { english: 'Father', vietnamese: 'Bố' },
+    { english: 'Brother', vietnamese: 'Anh/Em trai' },
+    { english: 'Sister', vietnamese: 'Chị/Em gái' },
+    { english: 'Grandmother', vietnamese: 'Bà' },
+    { english: 'Grandfather', vietnamese: 'Ông' },
+    { english: 'Baby', vietnamese: 'Em bé' },
+    { english: 'Family', vietnamese: 'Gia đình' },
+    { english: 'Aunt', vietnamese: 'Cô/Dì' },
+    { english: 'Uncle', vietnamese: 'Chú/Cậu' },
+    // Body Parts (10 words)
+    { english: 'Head', vietnamese: 'Đầu' },
+    { english: 'Hand', vietnamese: 'Bàn tay' },
+    { english: 'Foot', vietnamese: 'Bàn chân' },
+    { english: 'Eye', vietnamese: 'Mắt' },
+    { english: 'Ear', vietnamese: 'Tai' },
+    { english: 'Nose', vietnamese: 'Mũi' },
+    { english: 'Mouth', vietnamese: 'Miệng' },
+    { english: 'Arm', vietnamese: 'Cánh tay' },
+    { english: 'Leg', vietnamese: 'Chân' },
+    { english: 'Hair', vietnamese: 'Tóc' },
+    // Clothes (10 words)
+    { english: 'Shirt', vietnamese: 'Áo sơ mi' },
+    { english: 'Pants', vietnamese: 'Quần dài' },
+    { english: 'Dress', vietnamese: 'Váy' },
+    { english: 'Shoes', vietnamese: 'Giày' },
+    { english: 'Hat', vietnamese: 'Mũ' },
+    { english: 'Socks', vietnamese: 'Tất' },
+    { english: 'Coat', vietnamese: 'Áo khoác' },
+    { english: 'Skirt', vietnamese: 'Chân váy' },
+    { english: 'T-shirt', vietnamese: 'Áo phông' },
+    { english: 'Jacket', vietnamese: 'Áo jacket' },
+    // School Objects (10 words)
+    { english: 'Book', vietnamese: 'Sách' },
+    { english: 'Pen', vietnamese: 'Bút mực' },
+    { english: 'Pencil', vietnamese: 'Bút chì' },
+    { english: 'Eraser', vietnamese: 'Tẩy' },
+    { english: 'Ruler', vietnamese: 'Thước kẻ' },
+    { english: 'Bag', vietnamese: 'Cặp sách' },
+    { english: 'Desk', vietnamese: 'Bàn học' },
+    { english: 'Chair', vietnamese: 'Ghế' },
+    { english: 'Notebook', vietnamese: 'Vở' },
+    { english: 'Scissors', vietnamese: 'Kéo' },
+    // Professions (10 words)
+    { english: 'Teacher', vietnamese: 'Giáo viên' },
+    { english: 'Doctor', vietnamese: 'Bác sĩ' },
+    { english: 'Police Officer', vietnamese: 'Cảnh sát' },
+    { english: 'Firefighter', vietnamese: 'Lính cứu hỏa' },
+    { english: 'Chef', vietnamese: 'Đầu bếp' },
+    { english: 'Pilot', vietnamese: 'Phi công' },
+    { english: 'Artist', vietnamese: 'Họa sĩ' },
+    { english: 'Engineer', vietnamese: 'Kỹ sư' },
+    { english: 'Farmer', vietnamese: 'Nông dân' },
+    { english: 'Student', vietnamese: 'Học sinh' },
+    // Vehicles (10 words)
+    { english: 'Car', vietnamese: 'Ô tô' },
+    { english: 'Bicycle', vietnamese: 'Xe đạp' },
+    { english: 'Motorcycle', vietnamese: 'Xe máy' },
+    { english: 'Bus', vietnamese: 'Xe buýt' },
+    { english: 'Train', vietnamese: 'Tàu hỏa' },
+    { english: 'Airplane', vietnamese: 'Máy bay' },
+    { english: 'Boat', vietnamese: 'Thuyền' },
+    { english: 'Truck', vietnamese: 'Xe tải' },
+    { english: 'Helicopter', vietnamese: 'Máy bay trực thăng' },
+    { english: 'Tractor', vietnamese: 'Máy kéo' },
+    // Actions/Verbs (10 words)
+    { english: 'Run', vietnamese: 'Chạy' },
+    { english: 'Jump', vietnamese: 'Nhảy' },
+    { english: 'Eat', vietnamese: 'Ăn' },
+    { english: 'Drink', vietnamese: 'Uống' },
+    { english: 'Sleep', vietnamese: 'Ngủ' },
+    { english: 'Read', vietnamese: 'Đọc' },
+    { english: 'Write', vietnamese: 'Viết' },
+    { english: 'Sing', vietnamese: 'Hát' },
+    { english: 'Dance', vietnamese: 'Nhảy múa' },
+    { english: 'Play', vietnamese: 'Chơi' },
+    // Colors (10 words) - These words will be illustrated by their actual color on the box background.
+    { english: 'Red', vietnamese: 'Màu đỏ' },
+    { english: 'Blue', vietnamese: 'Màu xanh dương' },
+    { english: 'Green', vietnamese: 'Màu xanh lá' },
+    { english: 'Yellow', vietnamese: 'Màu vàng' },
+    { english: 'Orange', vietnamese: 'Màu cam' },
+    { english: 'Purple', vietnamese: 'Màu tím' },
+    { english: 'Pink', vietnamese: 'Màu hồng' },
+    { english: 'Black', vietnamese: 'Màu đen' },
+    { english: 'White', vietnamese: 'Màu trắng' },
+    { english: 'Brown', vietnamese: 'Màu nâu' },
+  ];
+
+  const colorMap = {
+    Red: '#FF0000', Blue: '#0000FF', Green: '#00FF00', Yellow: '#FFFF00', Orange: '#FFA500',
+    Purple: '#800080', Pink: '#FFC0CB', Black: '#000000', White: '#FFFFFF', Brown: '#A52A2A'
+  };
+  const colorWords = Object.keys(colorMap);
+
+  const [shuffledVocabulary, setShuffledVocabulary] = useState([]);
+  const [currentShuffledIndex, setCurrentShuffledIndex] = useState(0);
+  const [utterance, setUtterance] = useState(null);
+  const [isSpeechReady, setIsSpeechReady] = useState(false);
+  const [viewMode, setViewMode] = useState('game'); 
+  const [gameMode, setGameMode] = useState('flashcard'); 
+
+  const [quizOptions, setQuizOptions] = useState([]);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  
+  // Firebase related states
+  const [db, setDb] = useState(null);
+  const [auth, setAuth] = useState(null);
+  const [firebaseUser, setFirebaseUser] = useState(null); // The actual Firebase Auth user (anonymous)
+  const [activePasscode, setActivePasscode] = useState(null); // The passcode entered by the user
+  const [isLoading, setIsLoading] = useState(true); // Initial loading state for Firebase auth and data
+
+  // Passcode input state
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
+
+  // Progress states for each game mode and overall
+  const [gameProgress, setGameProgress] = useState({
+    flashcard: { score: 0, totalQuestions: 0 },
+    visual_quiz: { score: 0, totalQuestions: 0 },
+    audio_quiz: { score: 0, totalQuestions: 0 },
+    fill_in_blanks: { score: 0, totalQuestions: 0 },
+    matching_game: { score: 0, totalQuestions: 0 },
+    letter_scramble: { score: 0, totalQuestions: 0 },
+  });
+  const [overallScore, setOverallScore] = useState(0);
+  const [overallTotalQuestions, setOverallTotalQuestions] = useState(0);
 
 
-    <!-- React and ReactDOM CDNs -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  // Achievement states - still using localStorage for simplicity
+  const [firstCorrectAchievement, setFirstCorrectAchievement] = useState(() =>
+    localStorage.getItem('firstCorrectAchievement') === 'true'
+  );
+  const [tenCorrectAchievement, setTenCorrectAchievement] = useState(() =>
+    localStorage.getItem('tenCorrectAchievement') === 'true'
+  );
 
-    <style>
-      /* Custom styles if needed, but Tailwind is preferred */
-      body {
-        font-family: 'Inter', sans-serif;
-      }
-      /* Custom focus style for accessibility */
-      button:focus, input:focus {
-          outline: none;
-          box-shadow: 0 0 0 4px rgba(66, 153, 225, 0.5); /* A light blue ring */
-      }
+  const [fillInBlanksInput, setFillInBlanksInput] = useState('');
+  const [blankedWord, setBlankedWord] = useState('');
+  const [fillInBlanksCorrect, setFillInBlanksCorrect] = useState(null);
 
-      /* Keyframes for animations */
-      @keyframes bounce-once {
-          0% { transform: translateY(0); }
-          20% { transform: translateY(-10px); }
-          40% { transform: translateY(0); }
-          60% { transform: translateY(-5px); }
-          80% { transform: translateY(0); }
-          100% { transform: translateY(0); }
-      }
+  // Matching Game states
+  const [matchingCards, setMatchingCards] = useState([]);
+  const [flippedCards, setFlippedCards] = useState([]); // Stores IDs of currently flipped cards
+  const [matchedPairs, setMatchedPairs] = useState(0); // Count of matched pairs
+  const [matchingGameComplete, setMatchingGameComplete] = useState(false);
 
-      @keyframes shake-once {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-          20%, 40%, 60%, 80% { transform: translateX(5px); }
-      }
+  // Letter Scramble Game states (Click-based)
+  const [scrambledLetters, setScrambledLetters] = useState([]); // Array of {id, letter, originalIndex} for available letters
+  const [targetSlots, setTargetSlots] = useState([]); // Array of {id, letter} for drop targets
+  const [scrambleCorrect, setScrambleCorrect] = useState(null);
+  const [selectedScrambleLetter, setSelectedScrambleLetter] = useState(null); // The letter object currently selected by click
 
-      /* Apply animations */
-      .animate-bounce-once {
-          animation: bounce-once 0.5s ease-in-out;
-      }
-      .animate-shake-once {
-          animation: shake-once 0.5s ease-in-out;
-      }
 
-      /* Styles for Letter Scramble Game (Click-based) */
-      .scramble-letter-item {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer; /* Indicate clickable */
-        user-select: none; /* Prevent text selection */
-      }
-      .scramble-letter-item.selected {
-          border: 4px solid #FCD34D; /* Yellow ring for selected letter */
-          transform: scale(1.1); /* Slightly enlarge when selected */
-          box-shadow: 0 0 15px rgba(252, 211, 77, 0.6); /* Yellow glow */
-      }
-      .scramble-drop-zone {
-        border: 2px dashed #999; /* Dashed border for empty slots */
-        background-color: #f0f4f8; /* Light blueish background for empty slots */
-        font-size: 2.5rem; /* Larger font size for _ */
-        color: #777; /* Gray color for _ */
-        transition: background-color 0.2s ease, border-color 0.2s ease;
-        cursor: pointer; /* Indicate clickable */
-        user-select: none;
-      }
-      .scramble-drop-zone.active-target { /* Highlight when a letter is selected and this is a potential target */
-        background-color: #cfe2f3; /* Lighter blue on hover */
-        border-color: #63b3ed; /* Blue border on hover */
-      }
-      .scramble-drop-zone.filled {
-        border: 2px solid #66bb6a; /* Green border when filled */
-        background-color: #e6ffe6; /* Very light green when filled */
-        color: #1a202c; /* Dark text for readability */
-      }
-    </style>
-</head>
-<body class="bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 min-h-screen flex flex-col items-center justify-center p-4">
-    <div id="root"></div>
+  const currentWord = shuffledVocabulary[currentShuffledIndex];
 
-    <script type="text/babel">
-        // Define __app_id and __firebase_config globally for consistent access
-        // These values will be overridden by the Canvas environment if present
-        // but provide a fallback for direct browser execution.
-        window.__app_id = typeof window.__app_id !== 'undefined' ? window.__app_id : "tienganh-b5c92";
-        window.__firebase_config = typeof window.__firebase_config !== 'undefined'
-            ? window.__firebase_config
-            : JSON.stringify({
-                apiKey: "AIzaSyC5FTPfRIvLKhcGN6jDKEMXGx0eT_PoGfQ",
-                authDomain: "tienganh-b5c92.firebaseapp.com",
-                projectId: "tienganh-b5c92",
-                storageBucket: "tienganh-b5c92.firebasestorage.app",
-                messagingSenderId: "1097712667266", 
-                appId: "1:1097712667266:web:6c2ac844975f6a8a99429b",
-                measurementId: "G-K6FNDEE49T"
-              });
+  // --- Firebase Initialization and Auth Effect ---
+  useEffect(() => {
+    const appId = window.__app_id; 
+    const firebaseConfig = JSON.parse(window.__firebase_config);
 
-        // Main App component for the interactive English learning website
-        function App() {
-          // Destructure React hooks and Firebase global objects
-          const { useState, useEffect, useRef } = React;
-          const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signOut, getFirestore, doc, setDoc, onSnapshot, deleteDoc } = window.firebase;
+    if (Object.keys(firebaseConfig).length === 0) {
+        console.error("Firebase config is missing or empty.");
+        setIsLoading(false);
+        return;
+    }
 
-          const vocabulary = [
-            // Animals (10 words)
-            { english: 'Cat', vietnamese: 'Mèo' },
-            { english: 'Dog', vietnamese: 'Chó' },
-            { english: 'Bird', vietnamese: 'Chim' },
-            { english: 'Fish', vietnamese: 'Cá' },
-            { english: 'Lion', vietnamese: 'Sư tử' },
-            { english: 'Elephant', vietnamese: 'Voi' },
-            { english: 'Monkey', vietnamese: 'Khỉ' },
-            { english: 'Bear', vietnamese: 'Gấu' },
-            { english: 'Rabbit', vietnamese: 'Thỏ' },
-            { english: 'Tiger', vietnamese: 'Hổ' },
-            // Fruits (10 words)
-            { english: 'Apple', vietnamese: 'Quả táo' },
-            { english: 'Banana', vietnamese: 'Quả chuối' },
-            { english: 'Orange', vietnamese: 'Quả cam' },
-            { english: 'Grape', vietnamese: 'Quả nho' },
-            { english: 'Strawberry', vietnamese: 'Dâu tây' },
-            { english: 'Mango', vietnamese: 'Xoài' },
-            { english: 'Pineapple', vietnamese: 'Dứa' },
-            { english: 'Watermelon', vietnamese: 'Dưa hấu' },
-            { english: 'Cherry', vietnamese: 'Anh đào' },
-            { english: 'Kiwi', vietnamese: 'Kiwi' },
-            // Vegetables (10 words)
-            { english: 'Carrot', vietnamese: 'Cà rốt' },
-            { english: 'Tomato', vietnamese: 'Cà chua' },
-            { english: 'Potato', vietnamese: 'Khoai tây' },
-            { english: 'Broccoli', vietnamese: 'Bông cải xanh' },
-            { english: 'Onion', vietnamese: 'Hành tây' },
-            { english: 'Cucumber', vietnamese: 'Dưa chuột' },
-            { english: 'Pepper', vietnamese: 'Ớt chuông' },
-            { english: 'Cabbage', vietnamese: 'Bắp cải' },
-            { english: 'Corn', vietnamese: 'Ngô' },
-            { english: 'Lettuce', vietnamese: 'Xà lách' },
-            // Family (10 words)
-            { english: 'Mother', vietnamese: 'Mẹ' },
-            { english: 'Father', vietnamese: 'Bố' },
-            { english: 'Brother', vietnamese: 'Anh/Em trai' },
-            { english: 'Sister', vietnamese: 'Chị/Em gái' },
-            { english: 'Grandmother', vietnamese: 'Bà' },
-            { english: 'Grandfather', vietnamese: 'Ông' },
-            { english: 'Baby', vietnamese: 'Em bé' },
-            { english: 'Family', vietnamese: 'Gia đình' },
-            { english: 'Aunt', vietnamese: 'Cô/Dì' },
-            { english: 'Uncle', vietnamese: 'Chú/Cậu' },
-            // Body Parts (10 words)
-            { english: 'Head', vietnamese: 'Đầu' },
-            { english: 'Hand', vietnamese: 'Bàn tay' },
-            { english: 'Foot', vietnamese: 'Bàn chân' },
-            { english: 'Eye', vietnamese: 'Mắt' },
-            { english: 'Ear', vietnamese: 'Tai' },
-            { english: 'Nose', vietnamese: 'Mũi' },
-            { english: 'Mouth', vietnamese: 'Miệng' },
-            { english: 'Arm', vietnamese: 'Cánh tay' },
-            { english: 'Leg', vietnamese: 'Chân' },
-            { english: 'Hair', vietnamese: 'Tóc' },
-            // Clothes (10 words)
-            { english: 'Shirt', vietnamese: 'Áo sơ mi' },
-            { english: 'Pants', vietnamese: 'Quần dài' },
-            { english: 'Dress', vietnamese: 'Váy' },
-            { english: 'Shoes', vietnamese: 'Giày' },
-            { english: 'Hat', vietnamese: 'Mũ' },
-            { english: 'Socks', vietnamese: 'Tất' },
-            { english: 'Coat', vietnamese: 'Áo khoác' },
-            { english: 'Skirt', vietnamese: 'Chân váy' },
-            { english: 'T-shirt', vietnamese: 'Áo phông' },
-            { english: 'Jacket', vietnamese: 'Áo jacket' },
-            // School Objects (10 words)
-            { english: 'Book', vietnamese: 'Sách' },
-            { english: 'Pen', vietnamese: 'Bút mực' },
-            { english: 'Pencil', vietnamese: 'Bút chì' },
-            { english: 'Eraser', vietnamese: 'Tẩy' },
-            { english: 'Ruler', vietnamese: 'Thước kẻ' },
-            { english: 'Bag', vietnamese: 'Cặp sách' },
-            { english: 'Desk', vietnamese: 'Bàn học' },
-            { english: 'Chair', vietnamese: 'Ghế' },
-            { english: 'Notebook', vietnamese: 'Vở' },
-            { english: 'Scissors', vietnamese: 'Kéo' },
-            // Professions (10 words)
-            { english: 'Teacher', vietnamese: 'Giáo viên' },
-            { english: 'Doctor', vietnamese: 'Bác sĩ' },
-            { english: 'Police Officer', vietnamese: 'Cảnh sát' },
-            { english: 'Firefighter', vietnamese: 'Lính cứu hỏa' },
-            { english: 'Chef', vietnamese: 'Đầu bếp' },
-            { english: 'Pilot', vietnamese: 'Phi công' },
-            { english: 'Artist', vietnamese: 'Họa sĩ' },
-            { english: 'Engineer', vietnamese: 'Kỹ sư' },
-            { english: 'Farmer', vietnamese: 'Nông dân' },
-            { english: 'Student', vietnamese: 'Học sinh' },
-            // Vehicles (10 words)
-            { english: 'Car', vietnamese: 'Ô tô' },
-            { english: 'Bicycle', vietnamese: 'Xe đạp' },
-            { english: 'Motorcycle', vietnamese: 'Xe máy' },
-            { english: 'Bus', vietnamese: 'Xe buýt' },
-            { english: 'Train', vietnamese: 'Tàu hỏa' },
-            { english: 'Airplane', vietnamese: 'Máy bay' },
-            { english: 'Boat', vietnamese: 'Thuyền' },
-            { english: 'Truck', vietnamese: 'Xe tải' },
-            { english: 'Helicopter', vietnamese: 'Máy bay trực thăng' },
-            { english: 'Tractor', vietnamese: 'Máy kéo' },
-            // Actions/Verbs (10 words)
-            { english: 'Run', vietnamese: 'Chạy' },
-            { english: 'Jump', vietnamese: 'Nhảy' },
-            { english: 'Eat', vietnamese: 'Ăn' },
-            { english: 'Drink', vietnamese: 'Uống' },
-            { english: 'Sleep', vietnamese: 'Ngủ' },
-            { english: 'Read', vietnamese: 'Đọc' },
-            { english: 'Write', vietnamese: 'Viết' },
-            { english: 'Sing', vietnamese: 'Hát' },
-            { english: 'Dance', vietnamese: 'Nhảy múa' },
-            { english: 'Play', vietnamese: 'Chơi' },
-            // Colors (10 words) - These words will be illustrated by their actual color on the box background.
-            { english: 'Red', vietnamese: 'Màu đỏ' },
-            { english: 'Blue', vietnamese: 'Màu xanh dương' },
-            { english: 'Green', vietnamese: 'Màu xanh lá' },
-            { english: 'Yellow', vietnamese: 'Màu vàng' },
-            { english: 'Orange', vietnamese: 'Màu cam' },
-            { english: 'Purple', vietnamese: 'Màu tím' },
-            { english: 'Pink', vietnamese: 'Màu hồng' },
-            { english: 'Black', vietnamese: 'Màu đen' },
-            { english: 'White', vietnamese: 'Màu trắng' },
-            { english: 'Brown', vietnamese: 'Màu nâu' },
-          ];
+    try {
+        const app = initializeApp(firebaseConfig);
+        const firestoreDb = getFirestore(app);
+        const firebaseAuth = getAuth(app);
 
-          const colorMap = {
-            Red: '#FF0000', Blue: '#0000FF', Green: '#00FF00', Yellow: '#FFFF00', Orange: '#FFA500',
-            Purple: '#800080', Pink: '#FFC0CB', Black: '#000000', White: '#FFFFFF', Brown: '#A52A2A'
-          };
-          const colorWords = Object.keys(colorMap);
+        setDb(firestoreDb);
+        setAuth(firebaseAuth);
 
-          const [shuffledVocabulary, setShuffledVocabulary] = useState([]);
-          const [currentShuffledIndex, setCurrentShuffledIndex] = useState(0);
-          const [utterance, setUtterance] = useState(null);
-          const [isSpeechReady, setIsSpeechReady] = useState(false);
-          const [viewMode, setViewMode] = useState('game'); 
-          const [gameMode, setGameMode] = useState('flashcard'); 
+        // Listen for Firebase Auth state changes (primarily for anonymous user)
+        const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+            setFirebaseUser(user); // Set the Firebase Auth user object
 
-          const [quizOptions, setQuizOptions] = useState([]);
-          const [selectedAnswer, setSelectedAnswer] = useState(null);
-          
-          // Firebase related states
-          const [db, setDb] = useState(null);
-          const [auth, setAuth] = useState(null);
-          const [firebaseUser, setFirebaseUser] = useState(null); // The actual Firebase Auth user (anonymous)
-          const [activePasscode, setActivePasscode] = useState(null); // The passcode entered by the user
-          const [isLoading, setIsLoading] = useState(true); // Initial loading state for Firebase auth and data
+            // Attempt to sign in anonymously if no user is present
+            if (!user) {
+                try {
+                    await signInAnonymously(firebaseAuth);
+                    console.log("Signed in anonymously.");
+                } catch (error) {
+                    console.error("Firebase Anonymous Auth Error:", error);
+                }
+            }
+            setIsLoading(false); // Auth state check is complete
+        });
 
-          // Passcode input state
-          const [passcodeInput, setPasscodeInput] = useState('');
-          const [passcodeError, setPasscodeError] = useState('');
+        // Try to load last active passcode from localStorage
+        const storedPasscode = localStorage.getItem('lastPasscode');
+        if (storedPasscode) {
+            setActivePasscode(storedPasscode);
+            setPasscodeInput(storedPasscode); // Set input field to the stored passcode
+        } else {
+            setIsLoading(false); // If no stored passcode, no need to wait for firebase user
+        }
 
-          // Progress states for each game mode and overall
-          const [gameProgress, setGameProgress] = useState({
+
+        return () => unsubscribe(); // Cleanup auth listener on unmount
+    } catch (error) {
+        console.error("Failed to initialize Firebase:", error);
+        setIsLoading(false);
+    }
+  }, []); // Run only once on component mount
+
+  // --- Effect to manage local gameProgress state based on activePasscode ---
+  // This ensures that when passcode changes (login/logout), local state is reset or ready for new data.
+  useEffect(() => {
+      // If a passcode is active, initialize gameProgress to zeros.
+      // The onSnapshot listener will then populate it with actual data from Firestore.
+      // If passcode is null (signed out), also reset to zeros.
+      setGameProgress({
+          flashcard: { score: 0, totalQuestions: 0 },
+          visual_quiz: { score: 0, totalQuestions: 0 },
+          audio_quiz: { score: 0, totalQuestions: 0 },
+          fill_in_blanks: { score: 0, totalQuestions: 0 },
+          matching_game: { score: 0, totalQuestions: 0 },
+          letter_scramble: { score: 0, totalQuestions: 0 },
+      });
+      setOverallScore(0);
+      setOverallTotalQuestions(0);
+  }, [activePasscode]); // Trigger this effect whenever activePasscode changes
+
+
+  // --- Firestore Data Listener (for gameProgress) ---
+  useEffect(() => {
+    // Only listen if Firestore is ready, an anonymous Firebase user exists, AND an active passcode is set
+    if (!db || !firebaseUser || !activePasscode) {
+        console.log("Firestore listener not active: DB, User, or Passcode not ready. Will not reset local state here as it's handled by another useEffect.", {db: !!db, firebaseUser: !!firebaseUser, activePasscode});
+        return; // Don't attach listener if pre-requisites are not met
+    }
+
+    const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/profiles/${activePasscode}/learningProgress/userProgress`);
+
+    // Set up a real-time listener for user progress
+    const unsubscribe = onSnapshot(userProgressDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const loadedProgress = {
+          flashcard: data.flashcard || { score: 0, totalQuestions: 0 },
+          visual_quiz: data.visual_quiz || { score: 0, totalQuestions: 0 },
+          audio_quiz: data.audio_quiz || { score: 0, totalQuestions: 0 },
+          fill_in_blanks: data.fill_in_blanks || { score: 0, totalQuestions: 0 },
+          matching_game: data.matching_game || { score: 0, totalQuestions: 0 },
+          letter_scramble: data.letter_scramble || { score: 0, totalQuestions: 0 },
+        };
+        setGameProgress(loadedProgress);
+
+        // Calculate overall score and total questions
+        let sumScore = 0;
+        let sumTotalQuestions = 0;
+        for (const mode in loadedProgress) {
+          sumScore += loadedProgress[mode].score;
+          sumTotalQuestions += loadedProgress[mode].totalQuestions;
+        }
+        setOverallScore(sumScore);
+        setOverallTotalQuestions(sumTotalQuestions);
+
+      } else {
+        // Document doesn't exist for this passcode, create it with initial zeros
+        console.log(`No progress document found for passcode ${activePasscode}, creating with initial zeros.`);
+        const initialProgress = {
             flashcard: { score: 0, totalQuestions: 0 },
             visual_quiz: { score: 0, totalQuestions: 0 },
             audio_quiz: { score: 0, totalQuestions: 0 },
             fill_in_blanks: { score: 0, totalQuestions: 0 },
             matching_game: { score: 0, totalQuestions: 0 },
             letter_scramble: { score: 0, totalQuestions: 0 },
-          });
-          const [overallScore, setOverallScore] = useState(0);
-          const [overallTotalQuestions, setOverallTotalQuestions] = useState(0);
+        };
+        // The local gameProgress is already set to zeros by the `activePasscode` useEffect.
+        // This setDoc ensures the document exists in Firestore.
+        setDoc(userProgressDocRef, initialProgress, { merge: true })
+            .catch(e => console.error("Error setting initial doc:", e));
+      }
+    }, (error) => {
+        console.error("Error fetching Firestore progress:", error);
+    });
+
+    return () => unsubscribe(); // Cleanup listener on unmount
+  }, [db, firebaseUser, activePasscode, window.__app_id]); // Dependencies: db, firebaseUser, activePasscode
 
 
-          // Achievement states - still using localStorage for simplicity
-          const [firstCorrectAchievement, setFirstCorrectAchievement] = useState(() =>
-            localStorage.getItem('firstCorrectAchievement') === 'true'
+  // --- Update Firestore on gameProgress Change (Debounced Save) ---
+  useEffect(() => {
+    // Only update Firestore if Firebase is ready, an anonymous user is logged in, and a passcode is active
+    if (!db || !firebaseUser || !activePasscode) {
+        console.warn("Firestore save skipped: DB, User, or Passcode not ready.", {db: !!db, firebaseUser: !!firebaseUser, activePasscode});
+        return;
+    }
+    
+    const handler = setTimeout(() => {
+        console.log("Attempting to save gameProgress to Firestore (debounced):", gameProgress);
+        const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/profiles/${activePasscode}/learningProgress/userProgress`);
+        setDoc(userProgressDocRef, gameProgress, { merge: true })
+            .then(() => console.log("Game progress successfully saved!"))
+            .catch(e => {
+                console.error("Error updating Firestore progress:", e);
+            });
+    }, 500); // Debounce for 500ms
+
+    return () => {
+        clearTimeout(handler); // Clear timeout if gameProgress changes again before 500ms
+    };
+
+  }, [gameProgress, db, firebaseUser, activePasscode, window.__app_id]);
+
+
+  const shuffleAndSetNewWord = () => {
+    const tempVocab = [...vocabulary];
+    for (let i = tempVocab.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tempVocab[i], tempVocab[j]] = [tempVocab[j], tempVocab[i]];
+    }
+    setShuffledVocabulary(tempVocab);
+    setCurrentShuffledIndex(0);
+    return tempVocab[0];
+  };
+
+  useEffect(() => {
+    if ('speechSynthesis' in window) {
+      const synthUtterance = new SpeechSynthesisUtterance();
+      synthUtterance.lang = 'en-US';
+      synthUtterance.rate = 0.8;
+      setUtterance(synthUtterance);
+
+      const loadVoices = () => {
+        const voices = window.speechSynthesis.getVoices();
+        const englishUSVoice = voices.find(
+          voice => voice.lang === 'en-US' && (voice.name.includes('Google') || voice.name.includes('Samantha') || voice.name.includes('Alex'))
+        ) || voices.find(voice => voice.lang === 'en-US');
+
+        if (englishUSVoice) {
+          synthUtterance.voice = englishUSVoice;
+          console.log('Using voice:', englishUSVoice.name);
+        }
+        setIsSpeechReady(true);
+      };
+
+      if (window.speechSynthesis.getVoices().length > 0) {
+        loadVoices();
+      } else {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+
+    } else {
+      console.warn('Trình duyệt này không hỗ trợ chức năng phát âm.');
+    }
+    // Only shuffle if in game view and vocabulary isn't already shuffled
+    if (activePasscode && viewMode === 'game' && shuffledVocabulary.length === 0) { 
+        shuffleAndSetNewWord(); 
+    }
+  }, [viewMode, shuffledVocabulary.length, activePasscode]);
+
+
+  const generateMissingLettersWord = (word) => {
+    if (word.length <= 2) return word;
+    const letters = word.split('');
+    const numToBlank = Math.max(1, Math.floor(letters.length / 3));
+
+    let blankedIndices = new Set();
+    const availableIndices = Array.from({ length: letters.length - 2 }, (_, i) => i + 1);
+
+    while (blankedIndices.size < numToBlank && availableIndices.length > 0) {
+        const randomIndex = Math.floor(Math.random() * availableIndices.length);
+        const indexToBlank = availableIndices.splice(randomIndex, 1)[0];
+        blankedIndices.add(indexToBlank);
+    }
+
+    return letters.map((char, index) =>
+        blankedIndices.has(index) ? '_' : char
+    ).join('');
+  };
+
+
+  const generateGameOptionsForWord = (wordObject) => {
+    if (!wordObject) {
+        console.error("generateGameOptionsForWord called without a valid wordObject!");
+        return;
+    }
+    const correctWord = wordObject.english;
+    const allEnglishWords = [...new Set(vocabulary.map(word => word.english))];
+    let options = [correctWord];
+
+    const potentialDistractors = allEnglishWords.filter(word => word.toLowerCase() !== correctWord.toLowerCase());
+
+    while (options.length < 3 && potentialDistractors.length > 0) {
+      const randomIndex = Math.floor(Math.random() * (potentialDistractors.length));
+      options.push(potentialDistractors.splice(randomIndex, 1)[0]);
+    }
+    setQuizOptions(options.sort(() => Math.random() - 0.5));
+  };
+
+  // Matching Game Functions
+  const initializeMatchingGame = () => {
+    const pairs = [];
+    // Select 6 random words for the matching game (12 cards total)
+    const selectedWords = [];
+    const tempVocab = [...vocabulary];
+    while(selectedWords.length < 6 && tempVocab.length > 0) {
+        const randomIndex = Math.floor(Math.random() * tempVocab.length);
+        selectedWords.push(tempVocab.splice(randomIndex, 1)[0]);
+    }
+
+    selectedWords.forEach((word, index) => {
+      const uniqueId = `word-${index}`;
+      pairs.push({ id: `${uniqueId}-en`, value: word.english, type: 'english', isFlipped: false, isMatched: false, pairId: uniqueId });
+      pairs.push({ id: `${uniqueId}-vi`, value: word.vietnamese, type: 'vietnamese', isFlipped: false, isMatched: false, pairId: uniqueId });
+    });
+
+    // Shuffle cards
+    const shuffled = pairs.sort(() => Math.random() - 0.5);
+    setMatchingCards(shuffled);
+    setFlippedCards([]);
+    setMatchedPairs(0);
+    setMatchingGameComplete(false);
+  };
+
+  const handleMatchingCardClick = (clickedCard) => {
+    if (flippedCards.length === 2 || clickedCard.isFlipped || clickedCard.isMatched) {
+      return;
+    }
+
+    const newCards = matchingCards.map(card =>
+      card.id === clickedCard.id ? { ...card, isFlipped: true } : card
+    );
+    setMatchingCards(newCards);
+
+    const newFlipped = [...flippedCards, clickedCard];
+    setFlippedCards(newFlipped);
+
+    if (newFlipped.length === 2) {
+      const [card1, card2] = newFlipped;
+      if (card1.pairId === card2.pairId && card1.id !== card2.id) {
+        // Match found
+        setTimeout(() => {
+          const updatedCards = newCards.map(card =>
+            card.pairId === card1.pairId ? { ...card, isMatched: true } : card
           );
-          const [tenCorrectAchievement, setTenCorrectAchievement] = useState(() =>
-            localStorage.getItem('tenCorrectAchievement') === 'true'
+          setMatchingCards(updatedCards);
+          setMatchedPairs(prev => prev + 1);
+          setFlippedCards([]);
+        }, 800); // Keep cards flipped for a short duration
+        
+        // Update game-specific progress
+        setGameProgress(prev => ({
+            ...prev,
+            matching_game: {
+                score: prev.matching_game.score + 1,
+                totalQuestions: prev.matching_game.totalQuestions + 1
+            }
+        }));
+
+      } else {
+        // No match
+        setTimeout(() => {
+          const unflippedCards = newCards.map(card =>
+            (card.id === card1.id || card.id === card2.id) ? { ...card, isFlipped: false } : card
           );
-
-          const [fillInBlanksInput, setFillInBlanksInput] = useState('');
-          const [blankedWord, setBlankedWord] = useState('');
-          const [fillInBlanksCorrect, setFillInBlanksCorrect] = useState(null);
-
-          // Matching Game states
-          const [matchingCards, setMatchingCards] = useState([]);
-          const [flippedCards, setFlippedCards] = useState([]); // Stores IDs of currently flipped cards
-          const [matchedPairs, setMatchedPairs] = useState(0); // Count of matched pairs
-          const [matchingGameComplete, setMatchingGameComplete] = useState(false);
-
-          // Letter Scramble Game states (Click-based)
-          const [scrambledLetters, setScrambledLetters] = useState([]); // Array of {id, letter, originalIndex} for available letters
-          const [targetSlots, setTargetSlots] = useState([]); // Array of {id, letter} for drop targets
-          const [scrambleCorrect, setScrambleCorrect] = useState(null);
-          const [selectedScrambleLetter, setSelectedScrambleLetter] = useState(null); // The letter object currently selected by click
-
-
-          const currentWord = shuffledVocabulary[currentShuffledIndex];
-
-          // --- Firebase Initialization and Auth Effect ---
-          useEffect(() => {
-            const appId = window.__app_id; 
-            const firebaseConfig = JSON.parse(window.__firebase_config);
-
-            if (Object.keys(firebaseConfig).length === 0) {
-                console.error("Firebase config is missing or empty.");
-                setIsLoading(false);
-                return;
+          setMatchingCards(unflippedCards);
+          setFlippedCards([]);
+        }, 1000); // Flip back after a short duration
+        // Update totalQuestions for attempts in matching game
+        setGameProgress(prev => ({
+            ...prev,
+            matching_game: {
+                ...prev.matching_game,
+                totalQuestions: prev.matching_game.totalQuestions + 1
             }
-
-            try {
-                const app = initializeApp(firebaseConfig);
-                const firestoreDb = getFirestore(app);
-                const firebaseAuth = getAuth(app);
-
-                setDb(firestoreDb);
-                setAuth(firebaseAuth);
-
-                // Listen for Firebase Auth state changes (primarily for anonymous user)
-                const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
-                    setFirebaseUser(user); // Set the Firebase Auth user object
-
-                    // Attempt to sign in anonymously if no user is present
-                    if (!user) {
-                        try {
-                            await signInAnonymously(firebaseAuth);
-                            console.log("Signed in anonymously.");
-                        } catch (error) {
-                            console.error("Firebase Anonymous Auth Error:", error);
-                        }
-                    }
-                    setIsLoading(false); // Auth state check is complete
-                });
-
-                // Try to load last active passcode from localStorage
-                const storedPasscode = localStorage.getItem('lastPasscode');
-                if (storedPasscode) {
-                    setActivePasscode(storedPasscode);
-                    setPasscodeInput(storedPasscode); // Set input field to the stored passcode
-                } else {
-                    setIsLoading(false); // If no stored passcode, no need to wait for firebase user
-                }
-
-
-                return () => unsubscribe(); // Cleanup auth listener on unmount
-            } catch (error) {
-                console.error("Failed to initialize Firebase:", error);
-                setIsLoading(false);
-            }
-          }, []); // Run only once on component mount
-
-
-          // --- Firestore Data Listener (for gameProgress) ---
-          useEffect(() => {
-            // Only listen if Firestore is ready, an anonymous Firebase user exists, AND an active passcode is set
-            if (!db || !firebaseUser || !activePasscode) {
-                // If any of these are missing, reset progress states as no valid profile is loaded
-                setGameProgress({
-                    flashcard: { score: 0, totalQuestions: 0 },
-                    visual_quiz: { score: 0, totalQuestions: 0 },
-                    audio_quiz: { score: 0, totalQuestions: 0 },
-                    fill_in_blanks: { score: 0, totalQuestions: 0 },
-                    matching_game: { score: 0, totalQuestions: 0 },
-                    letter_scramble: { score: 0, totalQuestions: 0 },
-                });
-                setOverallScore(0);
-                setOverallTotalQuestions(0);
-                return;
-            }
-
-            const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/profiles/${activePasscode}/learningProgress/userProgress`);
-
-            // Set up a real-time listener for user progress
-            const unsubscribe = onSnapshot(userProgressDocRef, (docSnap) => {
-              if (docSnap.exists()) {
-                const data = docSnap.data();
-                const loadedProgress = {
-                  flashcard: data.flashcard || { score: 0, totalQuestions: 0 },
-                  visual_quiz: data.visual_quiz || { score: 0, totalQuestions: 0 },
-                  audio_quiz: data.audio_quiz || { score: 0, totalQuestions: 0 },
-                  fill_in_blanks: data.fill_in_blanks || { score: 0, totalQuestions: 0 },
-                  matching_game: data.matching_game || { score: 0, totalQuestions: 0 },
-                  letter_scramble: data.letter_scramble || { score: 0, totalQuestions: 0 },
-                };
-                setGameProgress(loadedProgress);
-
-                // Calculate overall score and total questions
-                let sumScore = 0;
-                let sumTotalQuestions = 0;
-                for (const mode in loadedProgress) {
-                  sumScore += loadedProgress[mode].score;
-                  sumTotalQuestions += loadedProgress[mode].totalQuestions;
-                }
-                setOverallScore(sumScore);
-                setOverallTotalQuestions(sumTotalQuestions);
-
-              } else {
-                // Document doesn't exist for this passcode, initialize with 0
-                console.log(`No progress found for passcode ${activePasscode}, initializing.`);
-                const initialProgress = {
-                    flashcard: { score: 0, totalQuestions: 0 },
-                    visual_quiz: { score: 0, totalQuestions: 0 },
-                    audio_quiz: { score: 0, totalQuestions: 0 },
-                    fill_in_blanks: { score: 0, totalQuestions: 0 },
-                    matching_game: { score: 0, totalQuestions: 0 },
-                    letter_scramble: { score: 0, totalQuestions: 0 },
-                };
-                setGameProgress(initialProgress);
-                setOverallScore(0);
-                setOverallTotalQuestions(0);
-                // Create the document with initial values if it doesn't exist
-                setDoc(userProgressDocRef, initialProgress, { merge: true })
-                    .catch(e => console.error("Error setting initial doc:", e));
-              }
-            }, (error) => {
-                console.error("Error fetching Firestore progress:", error);
-            });
-
-            return () => unsubscribe(); // Cleanup listener on unmount
-          }, [db, firebaseUser, activePasscode, window.__app_id]); // Dependencies: db, firebaseUser, activePasscode
-
-
-          // --- Update Firestore on gameProgress Change (Debounced Save) ---
-          useEffect(() => {
-            // Only update Firestore if Firebase is ready, an anonymous user is logged in, and a passcode is active
-            if (!db || !firebaseUser || !activePasscode) {
-                console.warn("Firestore save skipped: DB, User, or Passcode not ready.", {db: !!db, firebaseUser: !!firebaseUser, activePasscode});
-                return;
-            }
-            
-            const handler = setTimeout(() => {
-                console.log("Attempting to save gameProgress to Firestore (debounced):", gameProgress);
-                const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/profiles/${activePasscode}/learningProgress/userProgress`);
-                setDoc(userProgressDocRef, gameProgress, { merge: true })
-                    .then(() => console.log("Game progress successfully saved!"))
-                    .catch(e => {
-                        console.error("Error updating Firestore progress:", e);
-                    });
-            }, 500); // Debounce for 500ms
-
-            return () => {
-                clearTimeout(handler); // Clear timeout if gameProgress changes again before 500ms
-            };
-
-          }, [gameProgress, db, firebaseUser, activePasscode, window.__app_id]); // Removed achievement and overallScore from dependencies
-
-
-          const shuffleAndSetNewWord = () => {
-            const tempVocab = [...vocabulary];
-            for (let i = tempVocab.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [tempVocab[i], tempVocab[j]] = [tempVocab[j], tempVocab[i]];
-            }
-            setShuffledVocabulary(tempVocab);
-            setCurrentShuffledIndex(0);
-            return tempVocab[0];
-          };
-
-          useEffect(() => {
-            if ('speechSynthesis' in window) {
-              const synthUtterance = new SpeechSynthesisUtterance();
-              synthUtterance.lang = 'en-US';
-              synthUtterance.rate = 0.8;
-              setUtterance(synthUtterance);
-
-              const loadVoices = () => {
-                const voices = window.speechSynthesis.getVoices();
-                const englishUSVoice = voices.find(
-                  voice => voice.lang === 'en-US' && (voice.name.includes('Google') || voice.name.includes('Samantha') || voice.name.includes('Alex'))
-                ) || voices.find(voice => voice.lang === 'en-US');
-
-                if (englishUSVoice) {
-                  synthUtterance.voice = englishUSVoice;
-                  console.log('Using voice:', englishUSVoice.name);
-                }
-                setIsSpeechReady(true);
-              };
-
-              if (window.speechSynthesis.getVoices().length > 0) {
-                loadVoices();
-              } else {
-                window.speechSynthesis.onvoiceschanged = loadVoices;
-              }
-
-            } else {
-              console.warn('Trình duyệt này không hỗ trợ chức năng phát âm.');
-            }
-            // Only shuffle if in game view and vocabulary isn't already shuffled
-            if (activePasscode && viewMode === 'game' && shuffledVocabulary.length === 0) { 
-                shuffleAndSetNewWord(); 
-            }
-          }, [viewMode, shuffledVocabulary.length, activePasscode]);
-
-
-          const generateMissingLettersWord = (word) => {
-            if (word.length <= 2) return word;
-            const letters = word.split('');
-            const numToBlank = Math.max(1, Math.floor(letters.length / 3));
-
-            let blankedIndices = new Set();
-            const availableIndices = Array.from({ length: letters.length - 2 }, (_, i) => i + 1);
-
-            while (blankedIndices.size < numToBlank && availableIndices.length > 0) {
-                const randomIndex = Math.floor(Math.random() * availableIndices.length);
-                const indexToBlank = availableIndices.splice(randomIndex, 1)[0];
-                blankedIndices.add(indexToBlank);
-            }
-
-            return letters.map((char, index) =>
-                blankedIndices.has(index) ? '_' : char
-            ).join('');
-          };
-
-
-          const generateGameOptionsForWord = (wordObject) => {
-            if (!wordObject) {
-                console.error("generateGameOptionsForWord called without a valid wordObject!");
-                return;
-            }
-            const correctWord = wordObject.english;
-            const allEnglishWords = [...new Set(vocabulary.map(word => word.english))];
-            let options = [correctWord];
-
-            const potentialDistractors = allEnglishWords.filter(word => word.toLowerCase() !== correctWord.toLowerCase());
-
-            while (options.length < 3 && potentialDistractors.length > 0) {
-              const randomIndex = Math.floor(Math.random() * (potentialDistractors.length));
-              options.push(potentialDistractors.splice(randomIndex, 1)[0]);
-            }
-            setQuizOptions(options.sort(() => Math.random() - 0.5));
-          };
-
-          // Matching Game Functions
-          const initializeMatchingGame = () => {
-            const pairs = [];
-            // Select 6 random words for the matching game (12 cards total)
-            const selectedWords = [];
-            const tempVocab = [...vocabulary];
-            while(selectedWords.length < 6 && tempVocab.length > 0) {
-                const randomIndex = Math.floor(Math.random() * tempVocab.length);
-                selectedWords.push(tempVocab.splice(randomIndex, 1)[0]);
-            }
-
-            selectedWords.forEach((word, index) => {
-              const uniqueId = `word-${index}`;
-              pairs.push({ id: `${uniqueId}-en`, value: word.english, type: 'english', isFlipped: false, isMatched: false, pairId: uniqueId });
-              pairs.push({ id: `${uniqueId}-vi`, value: word.vietnamese, type: 'vietnamese', isFlipped: false, isMatched: false, pairId: uniqueId });
-            });
-
-            // Shuffle cards
-            const shuffled = pairs.sort(() => Math.random() - 0.5);
-            setMatchingCards(shuffled);
-            setFlippedCards([]);
-            setMatchedPairs(0);
-            setMatchingGameComplete(false);
-          };
-
-          const handleMatchingCardClick = (clickedCard) => {
-            if (flippedCards.length === 2 || clickedCard.isFlipped || clickedCard.isMatched) {
-              return;
-            }
-
-            const newCards = matchingCards.map(card =>
-              card.id === clickedCard.id ? { ...card, isFlipped: true } : card
-            );
-            setMatchingCards(newCards);
-
-            const newFlipped = [...flippedCards, clickedCard];
-            setFlippedCards(newFlipped);
-
-            if (newFlipped.length === 2) {
-              const [card1, card2] = newFlipped;
-              if (card1.pairId === card2.pairId && card1.id !== card2.id) {
-                // Match found
-                setTimeout(() => {
-                  const updatedCards = newCards.map(card =>
-                    card.pairId === card1.pairId ? { ...card, isMatched: true } : card
-                  );
-                  setMatchingCards(updatedCards);
-                  setMatchedPairs(prev => prev + 1);
-                  setFlippedCards([]);
-                }, 800); // Keep cards flipped for a short duration
-                
-                // Update game-specific progress
-                setGameProgress(prev => ({
-                    ...prev,
-                    matching_game: {
-                        score: prev.matching_game.score + 1,
-                        totalQuestions: prev.matching_game.totalQuestions + 1
-                    }
-                }));
-
-              } else {
-                // No match
-                setTimeout(() => {
-                  const unflippedCards = newCards.map(card =>
-                    (card.id === card1.id || card.id === card2.id) ? { ...card, isFlipped: false } : card
-                  );
-                  setMatchingCards(unflippedCards);
-                  setFlippedCards([]);
-                }, 1000); // Flip back after a short duration
-                // Update totalQuestions for attempts in matching game
-                setGameProgress(prev => ({
-                    ...prev,
-                    matching_game: {
-                        ...prev.matching_game,
-                        totalQuestions: prev.matching_game.totalQuestions + 1
-                    }
-                }));
-              }
-            }
-          };
-
-          useEffect(() => {
-            if (matchedPairs > 0 && matchedPairs * 2 === matchingCards.length && matchingCards.length > 0) {
-                setTimeout(() => {
-                    setMatchingGameComplete(true);
-                    // No alert, just log if needed: console.log('🎉 Chúc mừng! Bạn đã hoàn thành trò chơi ghép cặp!');
-                }, 500);
-            }
-          }, [matchedPairs, matchingCards.length]);
-
-
-          // Letter Scramble Game Functions (Click-based implementation)
-          const generateScrambledWord = (wordObject) => {
-            if (!wordObject) return;
-            const word = wordObject.english;
-            const letters = word.split('');
-            // Store original index to sort back if needed for display in pool
-            const scrambled = letters.map((letter, index) => ({ id: `${word}-${index}-${Math.random().toString(36).substr(2, 9)}`, letter, originalIndex: index }))
-                                     .sort(() => Math.random() - 0.5);
-
-            setScrambledLetters(scrambled);
-            setTargetSlots(Array(word.length).fill(null).map((_, index) => ({ id: `slot-${index}`, letter: null, originalIndex: index })));
-            setScrambleCorrect(null); // Reset correctness for new word
-            setSelectedScrambleLetter(null); // Reset selected letter
-          };
-
-          // Handle click on letters in the scramble pool
-          const handleScrambleLetterClick = (clickedLetter) => {
-              // If there's already a selected letter, and it's THIS letter, deselect it
-              if (selectedScrambleLetter && selectedScrambleLetter.id === clickedLetter.id) {
-                  setSelectedScrambleLetter(null);
-                  // Put the letter back to the scrambled pool
-                  setScrambledLetters(prevLetters => [...prevLetters, clickedLetter].sort((a,b) => a.originalIndex - b.originalIndex)); // Re-sort to maintain original order in pool
-              } else {
-                  // Deselect any currently selected letter and put it back to the pool
-                  if (selectedScrambleLetter) {
-                      setScrambledLetters(prevLetters => [...prevLetters, selectedScrambleLetter].sort((a,b) => a.originalIndex - b.originalIndex));
-                  }
-                  // Select the new letter and remove it from the scrambled pool (handled by state logic)
-                  setSelectedScrambleLetter(clickedLetter);
-                  setScrambledLetters(prevLetters => prevLetters.filter(l => l.id !== clickedLetter.id));
-              }
-              setScrambleCorrect(null); // Reset correctness feedback
-          };
-
-          // Handle click on target slots
-          const handleScrambleSlotClick = (clickedSlot, index) => {
-              // If a letter is selected from the pool
-              if (selectedScrambleLetter) {
-                  // If the slot is empty, place the selected letter into it
-                  if (!clickedSlot.letter) {
-                      setTargetSlots(prevSlots => prevSlots.map(s =>
-                          s.id === clickedSlot.id ? { ...s, letter: selectedScrambleLetter } : s
-                      ));
-                      setSelectedScrambleLetter(null); // Clear selected letter
-                  } else {
-                      // If the slot is already filled, move its current letter back to the scrambled letters pool
-                      // and then place the selected letter into the slot.
-                      const letterInSlot = clickedSlot.letter;
-                      
-                      // Put the letter from the slot back to the scrambled pool
-                      setScrambledLetters(prevLetters => [...prevLetters, letterInSlot].sort((a,b) => a.originalIndex - b.originalIndex));
-
-                      // Place the new selected letter into the clicked slot
-                      setTargetSlots(prevSlots => prevSlots.map(s =>
-                          s.id === clickedSlot.id ? { ...s, letter: selectedScrambleLetter } : s
-                      ));
-                      setSelectedScrambleLetter(null); // Clear selected letter
-                  }
-              } else if (clickedSlot.letter) {
-                  // If no letter is selected from the pool, but a letter is in the clicked slot,
-                  // move the letter from the slot back to the scrambled letters pool.
-                  const letterToMoveBack = clickedSlot.letter;
-                  setScrambledLetters(prevLetters => [...prevLetters, letterToMoveBack].sort((a,b) => a.originalIndex - b.originalIndex));
-                  setTargetSlots(prevSlots => prevSlots.map(s =>
-                      s.id === clickedSlot.id ? { ...s, letter: null } : s
-                  ));
-              }
-              // Always clear scramble correctness feedback when interacting
-              setScrambleCorrect(null);
-          };
-
-          const handleScrambleCheck = () => {
-            if (!currentWord) return;
-            const formedWord = targetSlots.map(slot => slot.letter ? slot.letter.letter : '').join('');
-            if (formedWord.toLowerCase() === currentWord.english.toLowerCase()) {
-                setScrambleCorrect(true);
-                setGameProgress(prev => ({
-                    ...prev,
-                    letter_scramble: {
-                        score: prev.letter_scramble.score + 1,
-                        totalQuestions: prev.letter_scramble.totalQuestions + 1
-                    }
-                }));
-            } else {
-                setScrambleCorrect(false);
-                setGameProgress(prev => ({
-                    ...prev,
-                    letter_scramble: {
-                        ...prev.letter_scramble,
-                        totalQuestions: prev.letter_scramble.totalQuestions + 1
-                    }
-                }));
-            }
-            setSelectedScrambleLetter(null); // Clear any selected letter after checking
-          };
-
-          // Unified effect for handling word changes within game modes (next/prev button clicks)
-          useEffect(() => {
-            if (viewMode !== 'game' || !currentWord) { 
-                return;
-            }
-
-            console.log('Main game logic useEffect triggered. Mode:', gameMode, 'Word:', currentWord ? currentWord.english : 'N/A');
-
-            if (gameMode === 'visual_quiz' || gameMode === 'audio_quiz') {
-                console.log('Generating quiz options for:', currentWord.english);
-                generateGameOptionsForWord(currentWord);
-            } else if (gameMode === 'fill_in_blanks') {
-                console.log('Generating blanked word for:', currentWord.english);
-                setBlankedWord(generateMissingLettersWord(currentWord.english));
-            } else if (gameMode === 'matching_game') {
-                console.log('Initializing matching game');
-                initializeMatchingGame();
-            } else if (gameMode === 'letter_scramble') {
-                console.log('Initializing letter scramble for word:', currentWord.english);
-                generateScrambledWord(currentWord); // Re-generate scrambled word
-            }
-            // Reset game-specific states for the current session
-            setSelectedAnswer(null);
-            setFillInBlanksInput('');
-            setFillInBlanksCorrect(null);
-            setScrambleCorrect(null);
-            setSelectedScrambleLetter(null); // Ensure no letter is selected from previous round
-          }, [currentShuffledIndex, gameMode, currentWord, viewMode]);
-
-
-          const speakWord = () => {
-            if (utterance && isSpeechReady && currentWord) {
-              window.speechSynthesis.cancel();
-              utterance.text = currentWord.english;
-              window.speechSynthesis.speak(utterance);
-            } else {
-              console.warn('Chức năng phát âm chưa sẵn sàng hoặc không được hỗ trợ.');
-            }
-          };
-
-          const nextWord = () => {
-            // Update progress for current game mode before moving to next word
-            if (gameMode === 'flashcard') {
-                // Flashcards don't have a score/total tracking per word, just view next.
-                // Could add logic here to track views if needed.
-            } else if (selectedAnswer !== null || fillInBlanksCorrect !== null || scrambleCorrect !== null) {
-                // Progress is already updated by handleAnswerClick, handleFillInBlanksSubmit, handleScrambleCheck
-            } else {
-                // If user skips without answering, increment totalQuestions for current game mode.
-                // This is a design choice. For simplicity, we assume an answer attempt leads to score/total update.
-                // If a 'skip' button existed, it would increment totalQuestions.
-            }
-
-            setCurrentShuffledIndex((prevIndex) => {
-              const nextIdx = (prevIndex + 1);
-              if (nextIdx >= shuffledVocabulary.length) {
-                shuffleAndSetNewWord();
-                return 0;
-              }
-              return nextIdx;
-            });
-          };
-
-          const prevWord = () => {
-            setCurrentShuffledIndex((prevIndex) => (prevIndex - 1 + shuffledVocabulary.length) % shuffledVocabulary.length);
-          };
-
-          const handleAnswerClick = (answer) => {
-            if (selectedAnswer !== null) return;
-
-            setSelectedAnswer(answer);
-            setGameProgress(prev => {
-                const updatedMode = { ...prev[gameMode] };
-                if (answer.toLowerCase() === currentWord.english.toLowerCase()) {
-                    updatedMode.score += 1;
-                }
-                updatedMode.totalQuestions += 1;
-                return { ...prev, [gameMode]: updatedMode };
-            });
-          };
-
-          const handleFillInBlanksInput = (event) => {
-            setFillInBlanksInput(event.target.value); 
-          };
-
-          const handleFillInBlanksSubmit = () => {
-            if (fillInBlanksCorrect !== null) return;
-
-            setGameProgress(prev => {
-                const updatedMode = { ...prev.fill_in_blanks };
-                if (fillInBlanksInput.toLowerCase() === currentWord.english.toLowerCase()) {
-                    updatedMode.score += 1;
-                    setFillInBlanksCorrect(true);
-                } else {
-                    setFillInBlanksCorrect(false);
-                }
-                updatedMode.totalQuestions += 1;
-                return { ...prev, fill_in_blanks: updatedMode };
-            });
-          };
-
-          const resetGame = () => {
-            // This reset is only for the *current game session's display*, not global progress
-            // Do NOT reset score/totalQuestions states here as they are managed by Firestore listener
-            
-            const newWord = shuffleAndSetNewWord();
-            
-            if (newWord) {
-                if (gameMode === 'visual_quiz' || gameMode === 'audio_quiz') {
-                    generateGameOptionsForWord(newWord);
-                } else if (gameMode === 'fill_in_blanks') {
-                    setBlankedWord(generateMissingLettersWord(newWord.english));
-                } else if (gameMode === 'matching_game') {
-                    initializeMatchingGame();
-                } else if (gameMode === 'letter_scramble') {
-                    generateScrambledWord(newWord);
-                }
-            }
-            setSelectedAnswer(null);
-            setFillInBlanksInput('');
-            setFillInBlanksCorrect(null);
-            setMatchingGameComplete(false);
-            setScrambleCorrect(null);
-            setSelectedScrambleLetter(null); // Ensure no selected letter on reset
-          };
-
-          const nextGameQuestion = () => {
-            nextWord();
-          };
-
-          const changeGameMode = (mode) => {
-            console.log("Changing game mode to:", mode);
-            setGameMode(mode);
-            // Do NOT reset global score/totalQuestions here, only game-specific session states
-            setSelectedAnswer(null);
-            setFillInBlanksInput('');
-            setBlankedWord('');
-            setFillInBlanksCorrect(null);
-            setMatchingGameComplete(false);
-            setScrambleCorrect(null);
-            setSelectedScrambleLetter(null); // Reset selected letter when changing mode
-
-            const newCurrentWord = shuffleAndSetNewWord();
-
-            if (newCurrentWord) {
-                if (mode === 'visual_quiz' || mode === 'audio_quiz') {
-                    console.log('Setting up quiz options for mode:', mode, 'and word:', newCurrentWord.english);
-                    generateGameOptionsForWord(newCurrentWord);
-                } else if (mode === 'fill_in_blanks') {
-                    console.log('Setting up fill-in-blanks for word:', newCurrentWord.english);
-                    setBlankedWord(generateMissingLettersWord(newCurrentWord.english));
-                } else if (mode === 'matching_game') {
-                    console.log('Setting up matching game');
-                    initializeMatchingGame(); // Always initialize matching game fresh
-                } else if (mode === 'letter_scramble') {
-                    console.log('Setting up letter scramble for word:', newCurrentWord.english);
-                    generateScrambledWord(newCurrentWord);
-                }
-            } else {
-                console.error("Failed to get a new current word after shuffling in changeGameMode for mode:", mode);
-            }
-          };
-
-          const resetAllProgress = async () => {
-            if (!db || !activePasscode || !firebaseUser) {
-                console.error('Firebase is not ready or you are not logged in with a passcode.');
-                return;
-            }
-            try {
-                // Create an initial state for all game modes (all zeros)
-                const initialProgress = {
-                    flashcard: { score: 0, totalQuestions: 0 },
-                    visual_quiz: { score: 0, totalQuestions: 0 },
-                    audio_quiz: { score: 0, totalQuestions: 0 },
-                    fill_in_blanks: { score: 0, totalQuestions: 0 },
-                    matching_game: { score: 0, totalQuestions: 0 },
-                    letter_scramble: { score: 0, totalQuestions: 0 },
-                };
-                const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/profiles/${activePasscode}/learningProgress/userProgress`);
-                await setDoc(userProgressDocRef, initialProgress); // Overwrite with initial zeros
-                
-                // Also reset achievement flags in local storage
-                setFirstCorrectAchievement(false);
-                localStorage.setItem('firstCorrectAchievement', 'false');
-                setTenCorrectAchievement(false);
-                localStorage.setItem('tenCorrectAchievement', 'false');
-
-                console.log('Learning progress and achievements have been reset on Cloud!');
-                // States will be updated by the onSnapshot listener after Firestore update
-            }
-            catch (error) {
-                console.error("Error resetting progress in Firestore:", error);
-            }
-          };
-
-          const progressPercentage = (shuffledVocabulary.length > 0 && gameMode !== 'matching_game')
-            ? ((currentShuffledIndex + 1) / shuffledVocabulary.length) * 100
-            : 0;
-
-          // --- Passcode Auth Handlers ---
-          const handlePasscodeLogin = () => {
-            setPasscodeError('');
-            if (!passcodeInput.trim()) {
-              setPasscodeError('Vui lòng nhập passcode.');
-              return;
-            }
-            localStorage.setItem('lastPasscode', passcodeInput.trim()); // Save passcode for next time
-            setActivePasscode(passcodeInput.trim()); // Set active passcode for data loading
-            console.log(`Welcome, ${passcodeInput.trim()}! Loading your progress.`);
-          };
-
-          const handlePasscodeSignOut = async () => {
-            setPasscodeError('');
-            localStorage.removeItem('lastPasscode'); // Clear saved passcode
-            setActivePasscode(null); // Clear active passcode
-            setPasscodeInput(''); // Clear input field
-            // Reset local states to reflect sign-out, Firestore listener will update them to 0s for new passcode
-            setGameProgress({
-                flashcard: { score: 0, totalQuestions: 0 },
-                visual_quiz: { score: 0, totalQuestions: 0 },
-                audio_quiz: { score: 0, totalQuestions: 0 },
-                fill_in_blanks: { score: 0, totalQuestions: 0 },
-                matching_game: { score: 0, totalQuestions: 0 },
-                letter_scramble: { score: 0, totalQuestions: 0 },
-            });
-            setOverallScore(0);
-            setOverallTotalQuestions(0);
-
-            console.log('You have signed out of the current passcode.');
-            // Optionally, sign out anonymous Firebase user too for a full reset
-            if (auth && firebaseUser) {
-              try {
-                await signOut(auth);
-                console.log("Signed out anonymous Firebase user.");
-              } catch (error) {
-                console.error("Error signing out anonymous user:", error);
-              }
-            }
-          };
-
-
-          // Display loading message if Firebase is still initializing or no passcode is active
-          if (isLoading || !activePasscode) {
-            return (
-              <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4">
-                <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md flex flex-col items-center border-4 border-blue-200">
-                  <h2 className="text-3xl md:text-4xl font-bold text-gray-700 mb-6 text-center">
-                    Chào mừng bạn!
-                  </h2>
-                  <p className="text-lg text-gray-600 mb-4 text-center">Nhập passcode của bạn để bắt đầu học nhé:</p>
-                  
-                  <input
-                    type="text"
-                    placeholder="Nhập passcode của bạn"
-                    value={passcodeInput}
-                    onChange={(e) => setPasscodeInput(e.target.value)}
-                    onKeyPress={(e) => { // Allow pressing Enter to login
-                        if (e.key === 'Enter') {
-                            handlePasscodeLogin();
-                        }
-                    }}
-                    className="w-full px-4 py-3 mb-4 border-2 border-blue-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 shadow-sm text-center"
-                  />
-                  {passcodeError && (
-                    <p className="text-red-500 text-sm mb-4 text-center">{passcodeError}</p>
-                  )}
-                  <button
-                    onClick={handlePasscodeLogin}
-                    className="w-full px-6 py-3 rounded-full font-bold text-lg bg-green-500 text-white shadow-lg hover:bg-green-600 transition-all duration-200 transform hover:scale-105 active:scale-95 mb-3"
-                  >
-                    <i className="fas fa-play-circle mr-2"></i> Bắt đầu học
-                  </button>
-                  <p className="text-sm text-gray-500 mt-2 text-center">
-                    (Mỗi passcode sẽ có tiến độ học tập riêng được lưu trên Cloud)
-                  </p>
-                </div>
-              </div>
-            );
+        }));
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (matchedPairs > 0 && matchedPairs * 2 === matchingCards.length && matchingCards.length > 0) {
+        setTimeout(() => {
+            setMatchingGameComplete(true);
+            // No alert, just log if needed: console.log('🎉 Chúc mừng! Bạn đã hoàn thành trò chơi ghép cặp!');
+        }, 500);
+    }
+  }, [matchedPairs, matchingCards.length]);
+
+
+  // Letter Scramble Game Functions (Click-based implementation)
+  const generateScrambledWord = (wordObject) => {
+    if (!wordObject) return;
+    const word = wordObject.english;
+    const letters = word.split('');
+    // Store original index to sort back if needed for display in pool
+    const scrambled = letters.map((letter, index) => ({ id: `${word}-${index}-${Math.random().toString(36).substr(2, 9)}`, letter, originalIndex: index }))
+                             .sort(() => Math.random() - 0.5);
+
+    setScrambledLetters(scrambled);
+    setTargetSlots(Array(word.length).fill(null).map((_, index) => ({ id: `slot-${index}`, letter: null, originalIndex: index })));
+    setScrambleCorrect(null); // Reset correctness for new word
+    setSelectedScrambleLetter(null); // Reset selected letter
+  };
+
+  // Handle click on letters in the scramble pool
+  const handleScrambleLetterClick = (clickedLetter) => {
+      // If there's already a selected letter, and it's THIS letter, deselect it
+      if (selectedScrambleLetter && selectedScrambleLetter.id === clickedLetter.id) {
+          setSelectedScrambleLetter(null);
+          // Put the letter back to the scrambled pool
+          setScrambledLetters(prevLetters => [...prevLetters, clickedLetter].sort((a,b) => a.originalIndex - b.originalIndex)); // Re-sort to maintain original order in pool
+      } else {
+          // Deselect any currently selected letter and put it back to the pool
+          if (selectedScrambleLetter) {
+              setScrambledLetters(prevLetters => [...prevLetters, selectedScrambleLetter].sort((a,b) => a.originalIndex - b.originalIndex));
           }
+          // Select the new letter and remove it from the scrambled pool (handled by state logic)
+          setSelectedScrambleLetter(clickedLetter);
+          setScrambledLetters(prevLetters => prevLetters.filter(l => l.id !== clickedLetter.id));
+      }
+      setScrambleCorrect(null); // Reset correctness feedback
+  };
+
+  // Handle click on target slots
+  const handleScrambleSlotClick = (clickedSlot, index) => {
+      // If a letter is selected from the pool
+      if (selectedScrambleLetter) {
+          // If the slot is empty, place the selected letter into it
+          if (!clickedSlot.letter) {
+              setTargetSlots(prevSlots => prevSlots.map(s =>
+                  s.id === clickedSlot.id ? { ...s, letter: selectedScrambleLetter } : s
+              ));
+              setSelectedScrambleLetter(null); // Clear selected letter
+          } else {
+              // If the slot is already filled, move its current letter back to the scrambled letters pool
+              // and then place the selected letter into the slot.
+              const letterInSlot = clickedSlot.letter;
+              
+              // Put the letter from the slot back to the scrambled pool
+              setScrambledLetters(prevLetters => [...prevLetters, letterInSlot].sort((a,b) => a.originalIndex - b.originalIndex));
+
+              // Place the new selected letter into the clicked slot
+              setTargetSlots(prevSlots => prevSlots.map(s =>
+                  s.id === clickedSlot.id ? { ...s, letter: selectedScrambleLetter } : s
+              ));
+              setSelectedScrambleLetter(null); // Clear selected letter
+          }
+      } else if (clickedSlot.letter) {
+          // If no letter is selected from the pool, but a letter is in the clicked slot,
+          // move the letter from the slot back to the scrambled letters pool.
+          const letterToMoveBack = clickedSlot.letter;
+          setScrambledLetters(prevLetters => [...prevLetters, letterToMoveBack].sort((a,b) => a.originalIndex - b.originalIndex));
+          setTargetSlots(prevSlots => prevSlots.map(s =>
+              s.id === clickedSlot.id ? { ...s, letter: null } : s
+          ));
+      }
+      // Always clear scramble correctness feedback when interacting
+      setScrambleCorrect(null);
+  };
+
+  const handleScrambleCheck = () => {
+    if (!currentWord) return;
+    const formedWord = targetSlots.map(slot => slot.letter ? slot.letter.letter : '').join('');
+    if (formedWord.toLowerCase() === currentWord.english.toLowerCase()) {
+        setScrambleCorrect(true);
+        setGameProgress(prev => ({
+            ...prev,
+            letter_scramble: {
+                score: prev.letter_scramble.score + 1,
+                totalQuestions: prev.letter_scramble.totalQuestions + 1
+            }
+        }));
+    } else {
+        setScrambleCorrect(false);
+        setGameProgress(prev => ({
+            ...prev,
+            letter_scramble: {
+                ...prev.letter_scramble,
+                totalQuestions: prev.letter_scramble.totalQuestions + 1
+            }
+        }));
+    }
+    setSelectedScrambleLetter(null); // Clear any selected letter after checking
+  };
+
+  // Unified effect for handling word changes within game modes (next/prev button clicks)
+  useEffect(() => {
+    if (viewMode !== 'game' || !currentWord) { 
+        return;
+    }
+
+    console.log('Main game logic useEffect triggered. Mode:', gameMode, 'Word:', currentWord ? currentWord.english : 'N/A');
+
+    if (gameMode === 'visual_quiz' || gameMode === 'audio_quiz') {
+        console.log('Generating quiz options for:', currentWord.english);
+        generateGameOptionsForWord(currentWord);
+    } else if (gameMode === 'fill_in_blanks') {
+        console.log('Generating blanked word for:', currentWord.english);
+        setBlankedWord(generateMissingLettersWord(currentWord.english));
+    } else if (gameMode === 'matching_game') {
+        console.log('Initializing matching game');
+        initializeMatchingGame();
+    } else if (gameMode === 'letter_scramble') {
+        console.log('Initializing letter scramble for word:', currentWord.english);
+        generateScrambledWord(currentWord); // Re-generate scrambled word
+    }
+    // Reset game-specific states for the current session
+    setSelectedAnswer(null);
+    setFillInBlanksInput('');
+    setFillInBlanksCorrect(null);
+    setScrambleCorrect(null);
+    setSelectedScrambleLetter(null); // Ensure no letter is selected from previous round
+  }, [currentShuffledIndex, gameMode, currentWord, viewMode]);
 
 
-          return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4 md:p-8 lg:p-12 font-inter text-gray-800">
-              {/* Page Title */}
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 md:mb-8 drop-shadow-lg text-center leading-tight">
-                Học Tiếng Anh Thật Vui! <i className="fas fa-child text-yellow-300 ml-3"></i>
-              </h1>
+  const speakWord = () => {
+    if (utterance && isSpeechReady && currentWord) {
+      window.speechSynthesis.cancel();
+      utterance.text = currentWord.english;
+      window.speechSynthesis.speak(utterance);
+    } else {
+      console.warn('Chức năng phát âm chưa sẵn sàng hoặc không được hỗ trợ.');
+    }
+  };
 
-              {/* Main Navigation - Game Modes vs. Progress */}
-              <div className="flex flex-wrap justify-center gap-3 md:gap-4 mb-6 md:mb-8 w-full max-w-lg">
-                <button
-                  onClick={() => setViewMode('game')}
-                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-lg sm:text-xl shadow-xl transition-all duration-300 transform hover:scale-105
-                    ${viewMode === 'game' ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white ring-4 ring-blue-300' : 'bg-blue-400 text-white hover:bg-blue-500 hover:shadow-2xl'}`}
-                >
-                  <i className="fas fa-gamepad mr-2"></i> Trò Chơi
-                </button>
-                <button
-                  onClick={() => setViewMode('progress')}
-                  className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-lg sm:text-xl shadow-xl transition-all duration-300 transform hover:scale-105
-                    ${viewMode === 'progress' ? 'bg-gradient-to-r from-green-600 to-green-800 text-white ring-4 ring-green-300' : 'bg-green-500 text-white hover:bg-green-600 hover:shadow-2xl'}`}
-                >
-                  <i className="fas fa-chart-line mr-2"></i> Xem Tiến Độ
-                </button>
-                <button
-                  onClick={handlePasscodeSignOut}
-                  className="flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-lg sm:text-xl shadow-xl transition-all duration-300 transform hover:scale-105 bg-gray-500 text-white hover:bg-gray-600 hover:shadow-2xl"
-                >
-                  <i className="fas fa-sign-out-alt mr-2"></i> Đăng xuất Passcode
-                </button>
-              </div>
+  const nextWord = () => {
+    // Update progress for current game mode before moving to next word
+    if (gameMode === 'flashcard') {
+        // Flashcards don't have a score/total tracking per word, just view next.
+        // Could add logic here to track views if needed.
+    } else if (selectedAnswer !== null || fillInBlanksCorrect !== null || scrambleCorrect !== null) {
+        // Progress is already updated by handleAnswerClick, handleFillInBlanksSubmit, handleScrambleCheck
+    } else {
+        // If user skips without answering, increment totalQuestions for current game mode.
+        // This is a design choice. For simplicity, we assume an answer attempt leads to score/total update.
+        // If a 'skip' button existed, it would increment totalQuestions.
+    }
 
-              {viewMode === 'game' ? (
-                <>
-                  {/* Mode Toggle Buttons for Games */}
-                  <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 md:gap-4 mb-6 md:mb-8 w-full max-w-sm sm:max-w-md lg:max-w-lg">
-                    <button
-                      onClick={() => changeGameMode('flashcard')}
-                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
-                        ${gameMode === 'flashcard' ? 'bg-indigo-600 text-white ring-2 ring-indigo-300' : 'bg-indigo-400 text-white hover:bg-indigo-500'}`}
-                    >
-                      Thẻ Từ
-                    </button>
-                    <button
-                      onClick={() => changeGameMode('visual_quiz')}
-                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
-                        ${gameMode === 'visual_quiz' ? 'bg-purple-600 text-white ring-2 ring-purple-300' : 'bg-purple-500 text-white hover:bg-purple-600'}`}
-                    >
-                      Trò chơi Hình ảnh & Từ
-                    </button>
-                    <button
-                      onClick={() => changeGameMode('audio_quiz')}
-                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
-                        ${gameMode === 'audio_quiz' ? 'bg-teal-600 text-white ring-2 ring-teal-300' : 'bg-teal-500 text-white hover:bg-teal-600'}`}
-                    >
-                      Trò chơi Nghe & Chọn
-                    </button>
-                    <button
-                      onClick={() => changeGameMode('fill_in_blanks')}
-                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
-                        ${gameMode === 'fill_in_blanks' ? 'bg-red-600 text-white ring-2 ring-red-300' : 'bg-red-500 text-white hover:bg-red-600'}`}
-                    >
-                      Viết Từ Còn Thiếu
-                    </button>
-                    <button
-                      onClick={() => changeGameMode('matching_game')}
-                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
-                        ${gameMode === 'matching_game' ? 'bg-yellow-600 text-white ring-2 ring-yellow-300' : 'bg-yellow-500 text-white hover:bg-yellow-600'}`}
-                    >
-                      Ghép Cặp
-                    </button>
-                    <button
-                      onClick={() => changeGameMode('letter_scramble')}
-                      className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
-                        ${gameMode === 'letter_scramble' ? 'bg-orange-600 text-white ring-2 ring-orange-300' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                    >
-                      Sắp Xếp Chữ Cái
-                    </button>
-                  </div>
+    setCurrentShuffledIndex((prevIndex) => {
+      const nextIdx = (prevIndex + 1);
+      if (nextIdx >= shuffledVocabulary.length) {
+        shuffleAndSetNewWord();
+        return 0;
+      }
+      return nextIdx;
+    });
+  };
 
-                  {/* Progress Bar for Games */}
-                  {(shuffledVocabulary.length > 0 && gameMode !== 'matching_game') && ( // Progress bar not applicable to matching game
-                    <div className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg bg-gray-200 rounded-full h-3 mb-6 overflow-hidden shadow-inner">
-                      <div
-                        className="bg-gradient-to-r from-yellow-400 to-green-500 h-full rounded-full transition-all duration-500 ease-out"
-                        style={{ width: `${progressPercentage}%` }}
-                      ></div>
-                    </div>
-                  )}
+  const prevWord = () => {
+    setCurrentShuffledIndex((prevIndex) => (prevIndex - 1 + shuffledVocabulary.length) % shuffledVocabulary.length);
+  };
 
-                  {currentWord ? (
-                    <>
-                      {gameMode === 'visual_quiz' ? (
-                        // Visual Quiz Mode UI
-                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-purple-200">
-                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
-                            Từ nào có nghĩa là "{currentWord.vietnamese}"?
-                          </h2>
+  const handleAnswerClick = (answer) => {
+    if (selectedAnswer !== null) return;
 
-                          <div className="grid grid-cols-1 gap-3 md:gap-4 w-full mb-6">
-                            {quizOptions.map((option, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => handleAnswerClick(option)}
-                                disabled={selectedAnswer !== null}
-                                className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95
-                                  ${selectedAnswer === null
-                                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                                    : option.toLowerCase() === currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
-                                      ? 'bg-green-500 text-white animate-bounce-once'
-                                      : option.toLowerCase() !== currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
-                                        ? 'bg-red-500 text-white animate-shake-once'
-                                        : option.toLowerCase() === currentWord.english.toLowerCase() && selectedAnswer !== null
-                                          ? 'bg-green-300 text-gray-800 border-2 border-green-500'
-                                          : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
-                                  }`}
-                              >
-                                {option}
-                              </button>
-                            ))}
-                          </div>
+    setSelectedAnswer(answer);
+    setGameProgress(prev => {
+        const updatedMode = { ...prev[gameMode] };
+        if (answer.toLowerCase() === currentWord.english.toLowerCase()) {
+            updatedMode.score += 1;
+        }
+        updatedMode.totalQuestions += 1;
+        return { ...prev, [gameMode]: updatedMode };
+    });
+  };
 
-                          {selectedAnswer && (
-                            <div className="mt-4 text-center flex flex-col items-center">
-                              {selectedAnswer.toLowerCase() === currentWord.english.toLowerCase() ? (
-                                <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
-                              ) : (
-                                <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
-                                    Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
-                                </p>
-                              )}
-                              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                                <button
-                                  onClick={speakWord}
-                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                >
-                                  <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
-                                </button>
-                                <button
-                                  onClick={nextGameQuestion}
-                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                >
-                                  Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
-                                </button>
-                              </div>
-                            </div>
-                          )}
+  const handleFillInBlanksInput = (event) => {
+    setFillInBlanksInput(event.target.value); 
+  };
 
-                          <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
-                            Điểm: {gameProgress.visual_quiz.score} / {gameProgress.visual_quiz.totalQuestions}
-                          </p>
-                          <button
-                            onClick={resetGame}
-                            className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                          >
-                            <i className="fas fa-redo mr-2"></i> Chơi lại Hình ảnh & Từ
-                          </button>
-                        </div>
-                      ) : gameMode === 'audio_quiz' ? (
-                        // Audio Quiz Mode UI (Listen & Choose)
-                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-teal-200">
-                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
-                            Bạn nghe từ nào?
-                          </h2>
-                          <button
-                            onClick={speakWord}
-                            disabled={!isSpeechReady}
-                            className="flex items-center justify-center px-6 py-3 sm:px-8 sm:py-4 bg-green-500 hover:bg-green-600 text-white font-semibold text-lg sm:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
-                          >
-                            <i className="fas fa-volume-up mr-2"></i> Nghe từ
-                          </button>
+  const handleFillInBlanksSubmit = () => {
+    if (fillInBlanksCorrect !== null) return;
 
-                          <div className="grid grid-cols-1 gap-3 md:gap-4 w-full mb-6">
-                            {quizOptions.map((option, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => handleAnswerClick(option)}
-                                disabled={selectedAnswer !== null}
-                                className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95
-                                  ${selectedAnswer === null
-                                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                                    : option.toLowerCase() === currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
-                                      ? 'bg-green-500 text-white animate-bounce-once'
-                                      : option.toLowerCase() !== currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
-                                        ? 'bg-red-500 text-white animate-shake-once'
-                                      : option.toLowerCase() === currentWord.english.toLowerCase() && selectedAnswer !== null
-                                          ? 'bg-green-300 text-gray-800 border-2 border-green-500'
-                                          : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
-                                  }`}
-                              >
-                                {option}
-                              </button>
-                            ))}
-                          </div>
+    setGameProgress(prev => {
+        const updatedMode = { ...prev.fill_in_blanks };
+        if (fillInBlanksInput.toLowerCase() === currentWord.english.toLowerCase()) {
+            updatedMode.score += 1;
+            setFillInBlanksCorrect(true);
+        } else {
+            setFillInBlanksCorrect(false);
+        }
+        updatedMode.totalQuestions += 1;
+        return { ...prev, fill_in_blanks: updatedMode };
+    });
+  };
 
-                          {selectedAnswer && (
-                            <div className="mt-4 text-center flex flex-col items-center">
-                              {selectedAnswer.toLowerCase() === currentWord.english.toLowerCase() ? (
-                                <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
-                              ) : (
-                                <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
-                                    Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
-                                </p>
-                              )}
-                              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                                <button
-                                  onClick={speakWord}
-                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                >
-                                  <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
-                                </button>
-                                <button
-                                  onClick={nextGameQuestion}
-                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                >
-                                  Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
-                                </button>
-                              </div>
-                            </div>
-                          )}
+  const resetGame = () => {
+    // This reset is only for the *current game session's display*, not global progress
+    // Do NOT reset score/totalQuestions states here as they are managed by Firestore listener
+    
+    const newWord = shuffleAndSetNewWord();
+    
+    if (newWord) {
+        if (gameMode === 'visual_quiz' || gameMode === 'audio_quiz') {
+            generateGameOptionsForWord(newWord);
+        } else if (gameMode === 'fill_in_blanks') {
+            setBlankedWord(generateMissingLettersWord(newWord.english));
+        } else if (gameMode === 'matching_game') {
+            initializeMatchingGame();
+        } else if (gameMode === 'letter_scramble') {
+            generateScrambledWord(newWord);
+        }
+    }
+    setSelectedAnswer(null);
+    setFillInBlanksInput('');
+    setFillInBlanksCorrect(null);
+    setMatchingGameComplete(false);
+    setScrambleCorrect(null);
+    setSelectedScrambleLetter(null); // Ensure no selected letter on reset
+  };
 
-                          <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
-                            Điểm: {gameProgress.audio_quiz.score} / {gameProgress.audio_quiz.totalQuestions}
-                          </p>
-                          <button
-                            onClick={resetGame}
-                            className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                          >
-                            <i className="fas fa-redo mr-2"></i> Chơi lại Nghe & Chọn
-                          </button>
-                        </div>
-                      ) : gameMode === 'fill_in_blanks' ? (
-                        // Fill in the Blanks Mode UI
-                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-red-200">
-                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
-                            Điền từ còn thiếu vào chỗ trống:
-                          </h2>
+  const nextGameQuestion = () => {
+    nextWord();
+  };
 
-                          <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 mb-4 select-none italic text-center px-2">
-                            "{currentWord.vietnamese}"
-                          </p>
+  const changeGameMode = (mode) => {
+    console.log("Changing game mode to:", mode);
+    setGameMode(mode);
+    // Do NOT reset global score/totalQuestions here, only game-specific session states
+    setSelectedAnswer(null);
+    setFillInBlanksInput('');
+    setBlankedWord('');
+    setFillInBlanksCorrect(null);
+    setMatchingGameComplete(false);
+    setScrambleCorrect(null);
+    setSelectedScrambleLetter(null); // Reset selected letter when changing mode
 
-                          <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-800 mb-6 tracking-wide text-center px-2">
-                            {blankedWord}
-                          </p>
+    const newCurrentWord = shuffleAndSetNewWord();
 
-                          <input
-                            type="text"
-                            value={fillInBlanksInput}
-                            onChange={(e) => setFillInBlanksInput(e.target.value)}
-                            disabled={fillInBlanksCorrect !== null}
-                            className="w-full max-w-xs md:max-w-sm lg:max-w-md px-4 py-3 mb-6 border-2 border-orange-400 rounded-lg text-xl md:text-2xl text-center focus:outline-none focus:ring-2 focus:ring-orange-500 transition duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed shadow-md"
-                            placeholder="Nhập từ tiếng Anh..."
-                          />
+    if (newCurrentWord) {
+        if (mode === 'visual_quiz' || mode === 'audio_quiz') {
+            console.log('Setting up quiz options for mode:', mode, 'and word:', newCurrentWord.english);
+            generateGameOptionsForWord(newCurrentWord);
+        } else if (mode === 'fill_in_blanks') {
+            console.log('Setting up fill-in-blanks for word:', newCurrentWord.english);
+            setBlankedWord(generateMissingLettersWord(newCurrentWord.english));
+        } else if (mode === 'matching_game') {
+            console.log('Setting up matching game');
+            initializeMatchingGame(); // Always initialize matching game fresh
+        } else if (mode === 'letter_scramble') {
+            console.log('Setting up letter scramble for word:', newCurrentWord.english);
+            generateScrambledWord(newCurrentWord);
+        }
+    } else {
+        console.error("Failed to get a new current word after shuffling in changeGameMode for mode:", mode);
+    }
+  };
 
-                          <button
-                            onClick={handleFillInBlanksSubmit}
-                            disabled={fillInBlanksCorrect !== null || fillInBlanksInput.trim() === ''}
-                            className={`px-8 py-4 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 mb-6
-                              ${fillInBlanksCorrect === null
-                                ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                                : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
-                              }`}
-                          >
-                            <i className="fas fa-check-circle mr-2"></i> Kiểm tra
-                          </button>
+  const resetAllProgress = async () => {
+    if (!db || !activePasscode || !firebaseUser) {
+        console.error('Firebase is not ready or you are not logged in with a passcode.');
+        return;
+    }
+    try {
+        // Create an initial state for all game modes (all zeros)
+        const initialProgress = {
+            flashcard: { score: 0, totalQuestions: 0 },
+            visual_quiz: { score: 0, totalQuestions: 0 },
+            audio_quiz: { score: 0, totalQuestions: 0 },
+            fill_in_blanks: { score: 0, totalQuestions: 0 },
+            matching_game: { score: 0, totalQuestions: 0 },
+            letter_scramble: { score: 0, totalQuestions: 0 },
+        };
+        const userProgressDocRef = doc(db, `artifacts/${window.__app_id}/profiles/${activePasscode}/learningProgress/userProgress`);
+        await setDoc(userProgressDocRef, initialProgress); // Overwrite with initial zeros
+        
+        // Also reset achievement flags in local storage
+        setFirstCorrectAchievement(false);
+        localStorage.setItem('firstCorrectAchievement', 'false');
+        setTenCorrectAchievement(false);
+        localStorage.setItem('tenCorrectAchievement', 'false');
 
-                          {fillInBlanksCorrect !== null && (
-                            <div className="mt-4 text-center flex flex-col items-center">
-                              {fillInBlanksCorrect ? (
-                                <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
-                              ) : (
-                                <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
-                                    Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
-                                </p>
-                              )}
-                              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                                <button
-                                  onClick={speakWord}
-                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                >
-                                  <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
-                                </button>
-                                <button
-                                  onClick={nextGameQuestion}
-                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                >
-                                  Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
-                                </button>
-                              </div>
-                            </div>
-                          )}
+        console.log('Learning progress and achievements have been reset on Cloud!');
+        // States will be updated by the onSnapshot listener after Firestore update
+    }
+    catch (error) {
+        console.error("Error resetting progress in Firestore:", error);
+    }
+  };
 
-                          <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
-                            Điểm: {gameProgress.fill_in_blanks.score} / {gameProgress.fill_in_blanks.totalQuestions}
-                          </p>
-                          <button
-                            onClick={resetGame}
-                            className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                          >
-                            <i className="fas fa-redo mr-2"></i> Chơi lại Viết Từ Còn Thiếu
-                          </button>
-                        </div>
-                      ) : gameMode === 'matching_game' ? (
-                        // Matching Game UI
-                        <div className="bg-white rounded-3xl shadow-2xl p-4 sm:p-5 md:p-6 w-full max-w-full lg:max-w-4xl flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-yellow-200">
-                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
-                            Ghép Cặp Từ
-                          </h2>
-                          {matchingGameComplete ? (
-                                <div className="text-center text-green-700 text-3xl font-bold mb-6 animate-bounce-once">
-                                    Bạn thật tuyệt vời! Bạn đã ghép đúng tất cả các cặp! 🎉
-                                    <button
-                                      onClick={resetGame}
-                                      className="mt-6 px-6 py-3 rounded-full font-semibold text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                    >
-                                        <i className="fas fa-redo mr-2"></i> Chơi lại Ghép Cặp
-                                    </button>
-                                </div>
-                          ) : (
-                              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3 md:gap-4 w-full max-w-4xl mb-6">
-                                {matchingCards.map(card => (
-                                  <div
-                                    key={card.id}
-                                    className={`relative w-full aspect-square rounded-xl shadow-lg flex items-center justify-center cursor-pointer transition-all duration-300 transform hover:scale-105
-                                      ${card.isFlipped || card.isMatched ? 'bg-gradient-to-br from-blue-100 to-purple-100' : 'bg-gray-200 hover:bg-gray-300'}`}
-                                    onClick={() => handleMatchingCardClick(card)}
-                                  >
-                                    <div className={`absolute inset-0 flex items-center justify-center text-center p-1 sm:p-2 font-semibold text-sm sm:text-base md:text-lg
-                                      ${card.isFlipped || card.isMatched ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300
-                                      ${card.isMatched ? 'text-green-700' : 'text-gray-800'}`}>
-                                      {card.value}
-                                    </div>
-                                    {/* Back of the card */}
-                                    <div className={`absolute inset-0 flex items-center justify-center text-center p-1 sm:p-2 rounded-xl bg-gradient-to-br from-indigo-400 to-pink-400 text-white font-bold text-xl sm:text-2xl md:text-3xl transform transition-all duration-300
-                                      ${card.isFlipped || card.isMatched ? 'rotate-y-180 opacity-0' : 'rotate-y-0 opacity-100'}`}>
-                                      <i className="fas fa-question text-white"></i>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                          )}
-                          <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
-                            Số cặp đã ghép: {matchedPairs} / {matchingCards.length / 2}
-                          </p>
-                          {!matchingGameComplete && (
-                            <button
-                                onClick={resetGame}
-                                className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                            >
-                                <i className="fas fa-redo mr-2"></i> Chơi lại Ghép Cặp
-                            </button>
-                          )}
-                        </div>
-                      ) : gameMode === 'letter_scramble' ? (
-                        // Letter Scramble Game UI
-                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-orange-200">
-                          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
-                            Sắp Xếp Chữ Cái
-                          </h2>
+  const progressPercentage = (shuffledVocabulary.length > 0 && gameMode !== 'matching_game')
+    ? ((currentShuffledIndex + 1) / shuffledVocabulary.length) * 100
+    : 0;
 
-                          <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 mb-4 select-none italic text-center px-2">
-                            "{currentWord.vietnamese}"
-                          </p>
+  // --- Passcode Auth Handlers ---
+  const handlePasscodeLogin = () => {
+    setPasscodeError('');
+    if (!passcodeInput.trim()) {
+      setPasscodeError('Vui lòng nhập passcode.');
+      return;
+    }
+    localStorage.setItem('lastPasscode', passcodeInput.trim()); // Save passcode for next time
+    setActivePasscode(passcodeInput.trim()); // This will trigger the useEffect for gameProgress reset/load
+    console.log(`Welcome, ${passcodeInput.trim()}! Loading your progress.`);
+  };
 
-                          {/* Clickable Letters Pool */}
-                          <div 
-                              className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6 p-3 bg-blue-50 rounded-lg shadow-inner w-full min-h-[70px]"
-                          >
-                            {scrambledLetters.map((item) => (
-                                <div
-                                    key={item.id}
-                                    onClick={() => handleScrambleLetterClick(item)}
-                                    className={`scramble-letter-item px-4 py-2 bg-blue-400 text-white font-bold text-xl sm:text-2xl rounded-lg shadow-md transition-all duration-200 hover:bg-blue-500 transform hover:scale-105
-                                        ${selectedScrambleLetter && selectedScrambleLetter.id === item.id ? 'selected' : ''}` // Visual feedback for selected
-                                    }
-                                >
-                                    {item.letter.toUpperCase()}
-                                </div>
-                            ))}
-                            {scrambledLetters.length === 0 && !selectedScrambleLetter && (
-                                <p className="text-gray-400 text-sm italic">Chọn chữ cái từ ô đã điền để chuyển về đây</p>
-                            )}
-                          </div>
+  const handlePasscodeSignOut = async () => {
+    setPasscodeError('');
+    localStorage.removeItem('lastPasscode'); // Clear saved passcode
+    setActivePasscode(null); // This will trigger the useEffect for gameProgress reset
+    setPasscodeInput(''); // Clear input field
+    // Optionally, sign out anonymous Firebase user too for a full reset
+    if (auth && firebaseUser) {
+      try {
+        await signOut(auth);
+        console.log("Signed out anonymous Firebase user.");
+      } catch (error) {
+        console.error("Error signing out anonymous user:", error);
+      }
+    }
+  };
 
-                          {/* Clickable Drop Zones (Target Slots) */}
-                          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6">
-                            {targetSlots.map((slot, index) => (
-                                <div
-                                    key={slot.id}
-                                    onClick={() => handleScrambleSlotClick(slot, index)}
-                                    className={`scramble-drop-zone w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center rounded-lg text-2xl sm:text-3xl font-bold
-                                        ${slot.letter ? 'bg-green-100 border-green-500 filled' : ''} 
-                                        ${selectedScrambleLetter && !slot.letter ? 'active-target' : ''}` // Visual feedback for available target
-                                    }
-                                >
-                                    {slot.letter ? (
-                                        <div 
-                                            // This div inside the slot is also clickable to move letter back to pool
-                                            onClick={(e) => { e.stopPropagation(); handleScrambleSlotClick(slot, index); }} // Prevent event bubbling to parent slot div
-                                            className="scramble-letter-item w-full h-full flex items-center justify-center"
-                                        >
-                                            {slot.letter.letter.toUpperCase()}
-                                        </div>
-                                    ) : '_'}
-                                </div>
-                            ))}
-                          </div>
 
-                          <button
-                            onClick={handleScrambleCheck}
-                            disabled={scrambleCorrect !== null || targetSlots.some(slot => slot.letter === null)} // Disable if already checked or not all slots filled
-                            className={`px-8 py-4 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 mb-6
-                              ${scrambleCorrect === null && targetSlots.every(slot => slot.letter !== null)
-                                ? 'bg-purple-500 hover:bg-purple-600 text-white'
-                                : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
-                              }`}
-                          >
-                            <i className="fas fa-check-circle mr-2"></i> Kiểm tra
-                          </button>
+  // Display loading message if Firebase is still initializing or no passcode is active
+  if (isLoading || !activePasscode) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md flex flex-col items-center border-4 border-blue-200">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-700 mb-6 text-center">
+            Chào mừng bạn!
+          </h2>
+          <p className="text-lg text-gray-600 mb-4 text-center">Nhập passcode của bạn để bắt đầu học nhé:</p>
+          
+          <input
+            type="text"
+            placeholder="Nhập passcode của bạn"
+            value={passcodeInput}
+            onChange={(e) => setPasscodeInput(e.target.value)}
+            onKeyPress={(e) => { // Allow pressing Enter to login
+                if (e.key === 'Enter') {
+                    handlePasscodeLogin();
+                }
+            }}
+            className="w-full px-4 py-3 mb-4 border-2 border-blue-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 shadow-sm text-center"
+          />
+          {passcodeError && (
+            <p className="text-red-500 text-sm mb-4 text-center">{passcodeError}</p>
+          )}
+          <button
+            onClick={handlePasscodeLogin}
+            className="w-full px-6 py-3 rounded-full font-bold text-lg bg-green-500 text-white shadow-lg hover:bg-green-600 transition-all duration-200 transform hover:scale-105 active:scale-95 mb-3"
+          >
+            <i className="fas fa-play-circle mr-2"></i> Bắt đầu học
+          </button>
+          <p className="text-sm text-gray-500 mt-2 text-center">
+            (Mỗi passcode sẽ có tiến độ học tập riêng được lưu trên Cloud)
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-                          {scrambleCorrect !== null && (
-                            <div className="mt-4 text-center flex flex-col items-center">
-                              {scrambleCorrect ? (
-                                <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
-                              ) : (
-                                <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
-                                    Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
-                                </p>
-                              )}
-                              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                                <button
-                                  onClick={speakWord}
-                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                >
-                                  <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
-                                </button>
-                                <button
-                                  onClick={nextGameQuestion}
-                                  className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                                >
-                                  Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                           <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
-                            Điểm: {gameProgress.letter_scramble.score} / {gameProgress.letter_scramble.totalQuestions}
-                          </p>
-                           <button
-                            onClick={resetGame}
-                            className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                          >
-                            <i className="fas fa-redo mr-2"></i> Chơi lại Sắp Xếp Chữ Cái
-                          </button>
-                        </div>
-                      ) : (
-                        // Flashcard Mode UI
-                        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-indigo-200">
-                          {(() => {
-                            const isColorWord = colorWords.includes(currentWord.english);
-                            const textColor = (currentWord.english === 'Black' || currentWord.english === 'Purple' || currentWord.english === 'Brown') ? 'white' : 'black';
-                            return (
-                              <div
-                                className={`flex items-center justify-center w-full max-w-[200px] sm:max-w-[250px] md:max-w-[300px] aspect-square rounded-xl mb-6 border-4 shadow-lg
-                                  ${isColorWord ? 'border-transparent' : 'border-purple-400'}
-                                `}
-                                style={isColorWord ? { backgroundColor: colorMap[currentWord.english], color: textColor } : {}}
-                              >
-                                <span className={`font-bold text-center px-2 select-none ${isColorWord ? 'text-2xl sm:text-3xl md:text-4xl uppercase' : 'text-4xl sm:text-5xl md:text-6xl text-gray-700'}`}>
-                                  {currentWord.english}
-                                </span>
-                              </div>
-                            );
-                          })()}
 
-                          <p className="text-4xl sm:text-5xl lg:text-7xl font-bold text-gray-800 mb-2 select-none tracking-wide text-center px-2">
-                            {currentWord.english}
-                          </p>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-300 via-purple-400 to-pink-300 flex flex-col items-center justify-center p-4 md:p-8 lg:p-12 font-inter text-gray-800">
+      {/* Page Title */}
+      <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 md:mb-8 drop-shadow-lg text-center leading-tight">
+        Học Tiếng Anh Thật Vui! <i className="fas fa-child text-yellow-300 ml-3"></i>
+      </h1>
 
-                          <p className="text-xl sm:text-2xl lg:text-4xl text-gray-600 mb-6 select-none italic text-center px-2">
-                            {currentWord.vietnamese}
-                          </p>
+      {/* Main Navigation - Game Modes vs. Progress */}
+      <div className="flex flex-wrap justify-center gap-3 md:gap-4 mb-6 md:mb-8 w-full max-w-lg">
+        <button
+          onClick={() => setViewMode('game')}
+          className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-lg sm:text-xl shadow-xl transition-all duration-300 transform hover:scale-105
+            ${viewMode === 'game' ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white ring-4 ring-blue-300' : 'bg-blue-400 text-white hover:bg-blue-500 hover:shadow-2xl'}`}
+        >
+          <i className="fas fa-gamepad mr-2"></i> Trò Chơi
+        </button>
+        <button
+          onClick={() => setViewMode('progress')}
+          className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-lg sm:text-xl shadow-xl transition-all duration-300 transform hover:scale-105
+            ${viewMode === 'progress' ? 'bg-gradient-to-r from-green-600 to-green-800 text-white ring-4 ring-green-300' : 'bg-green-500 text-white hover:bg-green-600 hover:shadow-2xl'}`}
+        >
+          <i className="fas fa-chart-line mr-2"></i> Xem Tiến Độ
+        </button>
+        <button
+          onClick={handlePasscodeSignOut}
+          className="flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-lg sm:text-xl shadow-xl transition-all duration-300 transform hover:scale-105 bg-gray-500 text-white hover:bg-gray-600 hover:shadow-2xl"
+        >
+          <i className="fas fa-sign-out-alt mr-2"></i> Đăng xuất Passcode
+        </button>
+      </div>
 
-                          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 md:space-x-6 w-full justify-center">
-                            <button
-                              onClick={prevWord}
-                              className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-yellow-500 hover:bg-yellow-500 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <i className="fas fa-arrow-left mr-2"></i> Trước
-                            </button>
+      {viewMode === 'game' ? (
+        <>
+          {/* Mode Toggle Buttons for Games */}
+          <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 md:gap-4 mb-6 md:mb-8 w-full max-w-sm sm:max-w-md lg:max-w-lg">
+            <button
+              onClick={() => changeGameMode('flashcard')}
+              className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                ${gameMode === 'flashcard' ? 'bg-indigo-600 text-white ring-2 ring-indigo-300' : 'bg-indigo-400 text-white hover:bg-indigo-500'}`}
+            >
+              Thẻ Từ
+            </button>
+            <button
+              onClick={() => changeGameMode('visual_quiz')}
+              className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                ${gameMode === 'visual_quiz' ? 'bg-purple-600 text-white ring-2 ring-purple-300' : 'bg-purple-500 text-white hover:bg-purple-600'}`}
+            >
+              Trò chơi Hình ảnh & Từ
+            </button>
+            <button
+              onClick={() => changeGameMode('audio_quiz')}
+              className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                ${gameMode === 'audio_quiz' ? 'bg-teal-600 text-white ring-2 ring-teal-300' : 'bg-teal-500 text-white hover:bg-teal-600'}`}
+            >
+              Trò chơi Nghe & Chọn
+            </button>
+            <button
+              onClick={() => changeGameMode('fill_in_blanks')}
+              className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                ${gameMode === 'fill_in_blanks' ? 'bg-red-600 text-white ring-2 ring-red-300' : 'bg-red-500 text-white hover:bg-red-600'}`}
+            >
+              Viết Từ Còn Thiếu
+            </button>
+            <button
+              onClick={() => changeGameMode('matching_game')}
+              className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                ${gameMode === 'matching_game' ? 'bg-yellow-600 text-white ring-2 ring-yellow-300' : 'bg-yellow-500 text-white hover:bg-yellow-600'}`}
+            >
+              Ghép Cặp
+            </button>
+            <button
+              onClick={() => changeGameMode('letter_scramble')}
+              className={`flex-1 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg shadow-md transition-all duration-200 transform hover:scale-105
+                ${gameMode === 'letter_scramble' ? 'bg-orange-600 text-white ring-2 ring-orange-300' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+            >
+              Sắp Xếp Chữ Cái
+            </button>
+          </div>
 
-                            <button
-                              onClick={speakWord}
-                              disabled={!isSpeechReady}
-                              className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-green-500 hover:bg-green-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <i className="fas fa-volume-up mr-2"></i> Nghe
-                            </button>
+          {/* Progress Bar for Games */}
+          {(shuffledVocabulary.length > 0 && gameMode !== 'matching_game') && ( // Progress bar not applicable to matching game
+            <div className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg bg-gray-200 rounded-full h-3 mb-6 overflow-hidden shadow-inner">
+              <div
+                className="bg-gradient-to-r from-yellow-400 to-green-500 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progressPercentage}%` }}
+              ></div>
+            </div>
+          )}
 
-                            <button
-                              onClick={nextWord}
-                              className="flex items-center justify-center px-5 py-2 sm:px-6 sm:py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-base sm:text-lg rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95"
-                            >
-                              Tiếp theo <i className="fas fa-arrow-right ml-2"></i>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-xl text-gray-700">Đang tải từ vựng...</div>
-                  )}
-                </>
-              ) : (
-                // Progress Page UI
-                <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-green-200">
-                  <h2 className="text-3xl md:text-4xl font-bold text-gray-700 mb-6 text-center">
-                    Tiến Độ Học Tập <i className="fas fa-chart-pie ml-2 text-orange-400"></i>
+          {currentWord ? (
+            <>
+              {gameMode === 'visual_quiz' ? (
+                // Visual Quiz Mode UI
+                <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-purple-200">
+                  <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                    Từ nào có nghĩa là "{currentWord.vietnamese}"?
                   </h2>
-                  <div className="text-center mb-8 bg-blue-50 p-4 rounded-xl shadow-inner w-full">
-                    <p className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
-                      Tổng số câu đúng: <span className="text-green-600">{overallScore}</span>
-                    </p>
-                    <p className="text-2xl md:text-3xl font-bold text-gray-800">
-                      Tổng số câu đã thử: <span className="text-blue-600">{overallTotalQuestions}</span>
-                    </p>
-                    {overallTotalQuestions > 0 && (
-                      <p className="text-xl md:text-2xl font-bold text-gray-700 mt-4">
-                        Tỷ lệ đúng: <span className="font-extrabold text-purple-600">{(overallScore / overallTotalQuestions * 100).toFixed(2)}%</span>
-                      </p>
-                    )}
-                    {overallTotalQuestions === 0 && (
-                      <p className="text-lg text-gray-500 mt-4">
-                        Hãy bắt đầu chơi để xem tiến độ của bạn!
-                      </p>
-                    )}
-                  </div>
 
-                  <h3 className="text-2xl font-bold text-gray-700 mt-6 mb-4">Tiến độ chi tiết theo trò chơi</h3>
-                  <div className="w-full flex flex-col items-center gap-3">
-                    {Object.entries(gameProgress).map(([gameName, progress]) => (
-                      <div key={gameName} className="w-full p-3 rounded-lg shadow-md flex flex-col bg-gray-100 border-l-4 border-gray-300">
-                        <span className="font-bold text-lg md:text-xl capitalize text-gray-800 mb-1">
-                          {gameName.replace('_', ' ')}:
-                        </span>
-                        <span className="text-base md:text-lg text-gray-700">
-                          Đúng: <span className="font-semibold text-green-600">{progress.score}</span> / Thử: <span className="font-semibold text-blue-600">{progress.totalQuestions}</span>
-                          {progress.totalQuestions > 0 && (
-                            <span className="ml-2 text-sm text-gray-600">({(progress.score / progress.totalQuestions * 100).toFixed(1)}%)</span>
-                          )}
-                        </span>
-                      </div>
+                  <div className="grid grid-cols-1 gap-3 md:gap-4 w-full mb-6">
+                    {quizOptions.map((option, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleAnswerClick(option)}
+                        disabled={selectedAnswer !== null}
+                        className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95
+                          ${selectedAnswer === null
+                            ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                            : option.toLowerCase() === currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
+                              ? 'bg-green-500 text-white animate-bounce-once'
+                              : option.toLowerCase() !== currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
+                                ? 'bg-red-500 text-white animate-shake-once'
+                                : option.toLowerCase() === currentWord.english.toLowerCase() && selectedAnswer !== null
+                                  ? 'bg-green-300 text-gray-800 border-2 border-green-500'
+                                  : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
+                          }`}
+                      >
+                        {option}
+                      </button>
                     ))}
                   </div>
 
-                  <h3 className="text-2xl font-bold text-gray-700 mt-8 mb-4">Thành tích của bạn</h3>
-                  <div className="w-full flex flex-col items-center gap-3">
-                    <div className={`w-full p-3 rounded-lg shadow-md flex items-center justify-between text-lg md:text-xl font-semibold
-                      ${firstCorrectAchievement ? 'bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500' : 'bg-gray-100 text-gray-500'}`}>
-                      <span>
-                        <i className={`fas fa-star mr-2 ${firstCorrectAchievement ? 'text-yellow-500' : 'text-gray-400'}`}></i> Câu trả lời đúng đầu tiên
-                      </span>
-                      {firstCorrectAchievement && <i className="fas fa-check-circle text-green-500 ml-2"></i>}
+                  {selectedAnswer && (
+                    <div className="mt-4 text-center flex flex-col items-center">
+                      {selectedAnswer.toLowerCase() === currentWord.english.toLowerCase() ? (
+                        <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
+                      ) : (
+                        <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                            Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
+                        </p>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                        <button
+                          onClick={speakWord}
+                          className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                        >
+                          <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
+                        </button>
+                        <button
+                          onClick={nextGameQuestion}
+                          className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                        >
+                          Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
+                        </button>
+                      </div>
                     </div>
-                    <div className={`w-full p-3 rounded-lg shadow-md flex items-center justify-between text-lg md:text-xl font-semibold
-                      ${tenCorrectAchievement ? 'bg-purple-100 text-purple-800 border-l-4 border-purple-500' : 'bg-gray-100 text-gray-500'}`}>
-                      <span>
-                        <i className={`fas fa-medal mr-2 ${tenCorrectAchievement ? 'text-purple-500' : 'text-gray-400'}`}></i> 10 câu trả lời đúng
-                      </span>
-                      {tenCorrectAchievement && <i className="fas fa-check-circle text-green-500 ml-2"></i>}
+                  )}
+
+                  <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                    Điểm: {gameProgress.visual_quiz.score} / {gameProgress.visual_quiz.totalQuestions}
+                  </p>
+                  <button
+                    onClick={resetGame}
+                    className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                  >
+                    <i className="fas fa-redo mr-2"></i> Chơi lại Hình ảnh & Từ
+                  </button>
+                </div>
+              ) : gameMode === 'audio_quiz' ? (
+                // Audio Quiz Mode UI (Listen & Choose)
+                <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-teal-200">
+                  <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                    Bạn nghe từ nào?
+                  </h2>
+                  <button
+                    onClick={speakWord}
+                    disabled={!isSpeechReady}
+                    className="flex items-center justify-center px-6 py-3 sm:px-8 sm:py-4 bg-green-500 hover:bg-green-600 text-white font-semibold text-lg sm:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+                  >
+                    <i className="fas fa-volume-up mr-2"></i> Nghe từ
+                  </button>
+
+                  <div className="grid grid-cols-1 gap-3 md:gap-4 w-full mb-6">
+                    {quizOptions.map((option, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleAnswerClick(option)}
+                        disabled={selectedAnswer !== null}
+                        className={`py-3 px-5 rounded-full font-semibold text-base sm:text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95
+                          ${selectedAnswer === null
+                            ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                            : option.toLowerCase() === currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
+                              ? 'bg-green-500 text-white animate-bounce-once'
+                              : option.toLowerCase() !== currentWord.english.toLowerCase() && option.toLowerCase() === selectedAnswer.toLowerCase()
+                                ? 'bg-red-500 text-white animate-shake-once'
+                              : option.toLowerCase() === currentWord.english.toLowerCase() && selectedAnswer !== null
+                                  ? 'bg-green-300 text-gray-800 border-2 border-green-500'
+                                  : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
+                          }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedAnswer && (
+                    <div className="mt-4 text-center flex flex-col items-center">
+                      {selectedAnswer.toLowerCase() === currentWord.english.toLowerCase() ? (
+                        <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
+                      ) : (
+                        <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                            Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
+                        </p>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                        <button
+                          onClick={speakWord}
+                          className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                        >
+                          <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
+                        </button>
+                        <button
+                          onClick={nextGameQuestion}
+                          className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                        >
+                          Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-4 w-full justify-center mt-8">
+                  )}
+
+                  <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                    Điểm: {gameProgress.audio_quiz.score} / {gameProgress.audio_quiz.totalQuestions}
+                  </p>
+                  <button
+                    onClick={resetGame}
+                    className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                  >
+                    <i className="fas fa-redo mr-2"></i> Chơi lại Nghe & Chọn
+                  </button>
+                </div>
+              ) : gameMode === 'fill_in_blanks' ? (
+                // Fill in the Blanks Mode UI
+                <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-red-200">
+                  <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                    Điền từ còn thiếu vào chỗ trống:
+                  </h2>
+
+                  <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 mb-4 select-none italic text-center px-2">
+                    "{currentWord.vietnamese}"
+                  </p>
+
+                  <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-800 mb-6 tracking-wide text-center px-2">
+                    {blankedWord}
+                  </p>
+
+                  <input
+                    type="text"
+                    value={fillInBlanksInput}
+                    onChange={(e) => setFillInBlanksInput(e.target.value)}
+                    disabled={fillInBlanksCorrect !== null}
+                    className="w-full max-w-xs md:max-w-sm lg:max-w-md px-4 py-3 mb-6 border-2 border-orange-400 rounded-lg text-xl md:text-2xl text-center focus:outline-none focus:ring-2 focus:ring-orange-500 transition duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed shadow-md"
+                    placeholder="Nhập từ tiếng Anh..."
+                  />
+
+                  <button
+                    onClick={handleFillInBlanksSubmit}
+                    disabled={fillInBlanksCorrect !== null || fillInBlanksInput.trim() === ''}
+                    className={`px-8 py-4 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 mb-6
+                      ${fillInBlanksCorrect === null
+                        ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                        : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
+                      }`}
+                  >
+                    <i className="fas fa-check-circle mr-2"></i> Kiểm tra
+                  </button>
+
+                  {fillInBlanksCorrect !== null && (
+                    <div className="mt-4 text-center flex flex-col items-center">
+                      {fillInBlanksCorrect ? (
+                        <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
+                      ) : (
+                        <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                            Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
+                        </p>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                        <button
+                          onClick={speakWord}
+                          className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                        >
+                          <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
+                        </button>
+                        <button
+                          onClick={nextGameQuestion}
+                          className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                        >
+                          Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                    Điểm: {gameProgress.fill_in_blanks.score} / {gameProgress.fill_in_blanks.totalQuestions}
+                  </p>
+                  <button
+                    onClick={resetGame}
+                    className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                  >
+                    <i className="fas fa-redo mr-2"></i> Chơi lại Viết Từ Còn Thiếu
+                  </button>
+                </div>
+              ) : gameMode === 'matching_game' ? (
+                // Matching Game UI
+                <div className="bg-white rounded-3xl shadow-2xl p-4 sm:p-5 md:p-6 w-full max-w-full lg:max-w-4xl flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-yellow-200">
+                  <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                    Ghép Cặp Từ
+                  </h2>
+                  {matchingGameComplete ? (
+                        <div className="text-center text-green-700 text-3xl font-bold mb-6 animate-bounce-once">
+                            Bạn thật tuyệt vời! Bạn đã ghép đúng tất cả các cặp! 🎉
+                            <button
+                              onClick={resetGame}
+                              className="mt-6 px-6 py-3 rounded-full font-semibold text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                            >
+                                <i className="fas fa-redo mr-2"></i> Chơi lại Ghép Cặp
+                            </button>
+                        </div>
+                  ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3 md:gap-4 w-full max-w-4xl mb-6">
+                        {matchingCards.map(card => (
+                          <div
+                            key={card.id}
+                            className={`relative w-full aspect-square rounded-xl shadow-lg flex items-center justify-center cursor-pointer transition-all duration-300 transform hover:scale-105
+                              ${card.isFlipped || card.isMatched ? 'bg-gradient-to-br from-blue-100 to-purple-100' : 'bg-gray-200 hover:bg-gray-300'}`}
+                            onClick={() => handleMatchingCardClick(card)}
+                          >
+                            <div className={`absolute inset-0 flex items-center justify-center text-center p-1 sm:p-2 font-semibold text-sm sm:text-base md:text-lg
+                              ${card.isFlipped || card.isMatched ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300
+                              ${card.isMatched ? 'text-green-700' : 'text-gray-800'}`}>
+                              {card.value}
+                            </div>
+                            {/* Back of the card */}
+                            <div className={`absolute inset-0 flex items-center justify-center text-center p-1 sm:p-2 rounded-xl bg-gradient-to-br from-indigo-400 to-pink-400 text-white font-bold text-xl sm:text-2xl md:text-3xl transform transition-all duration-300
+                              ${card.isFlipped || card.isMatched ? 'rotate-y-180 opacity-0' : 'rotate-y-0 opacity-100'}`}>
+                              <i className="fas fa-question text-white"></i>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                  )}
+                  <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                    Số cặp đã ghép: {matchedPairs} / {matchingCards.length / 2}
+                  </p>
+                  {!matchingGameComplete && (
                     <button
-                      onClick={resetAllProgress}
-                      className="px-6 py-3 rounded-full font-semibold text-lg bg-red-500 text-white shadow-lg hover:bg-red-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                        onClick={resetGame}
+                        className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
                     >
-                      <i className="fas fa-eraser mr-2"></i> Đặt Lại Tiến Độ
+                        <i className="fas fa-redo mr-2"></i> Chơi lại Ghép Cặp
                     </button>
-                    <button
-                      onClick={() => setViewMode('game')}
-                      className="px-6 py-3 rounded-full font-semibold text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
-                    >
-                      <i className="fas fa-play-circle mr-2"></i> Quay Lại Trò Chơi
-                    </button>
-                  </div>
-                  {/* Display active passcode for user to identify */}
-                  {activePasscode && (
-                    <p className="text-gray-600 text-sm mt-4 text-center break-all">
-                      Passcode hiện tại: <span className="font-mono text-gray-800">{activePasscode}</span>
-                    </p>
                   )}
                 </div>
+              ) : gameMode === 'letter_scramble' ? (
+                // Letter Scramble Game UI
+                <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-orange-200">
+                  <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-700 mb-6 text-center">
+                    Sắp Xếp Chữ Cái
+                  </h2>
+
+                  <p className="text-xl md:text-2xl lg:text-3xl text-gray-600 mb-4 select-none italic text-center px-2">
+                    "{currentWord.vietnamese}"
+                  </p>
+
+                  {/* Clickable Letters Pool */}
+                  <div 
+                      className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6 p-3 bg-blue-50 rounded-lg shadow-inner w-full min-h-[70px]"
+                  >
+                    {scrambledLetters.map((item) => (
+                        <div
+                            key={item.id}
+                            onClick={() => handleScrambleLetterClick(item)}
+                            className={`scramble-letter-item px-4 py-2 bg-blue-400 text-white font-bold text-xl sm:text-2xl rounded-lg shadow-md transition-all duration-200 hover:bg-blue-500 transform hover:scale-105
+                                ${selectedScrambleLetter && selectedScrambleLetter.id === item.id ? 'selected' : ''}` // Visual feedback for selected
+                            }
+                        >
+                            {item.letter.toUpperCase()}
+                        </div>
+                    ))}
+                    {scrambledLetters.length === 0 && !selectedScrambleLetter && (
+                        <p className="text-gray-400 text-sm italic">Chọn chữ cái từ ô đã điền để chuyển về đây</p>
+                    )}
+                  </div>
+
+                  {/* Clickable Drop Zones (Target Slots) */}
+                  <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6">
+                    {targetSlots.map((slot, index) => (
+                        <div
+                            key={slot.id}
+                            onClick={() => handleScrambleSlotClick(slot, index)}
+                            className={`scramble-drop-zone w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center rounded-lg text-2xl sm:text-3xl font-bold
+                                ${slot.letter ? 'bg-green-100 border-green-500 filled' : ''} 
+                                ${selectedScrambleLetter && !slot.letter ? 'active-target' : ''}` // Visual feedback for available target
+                            }
+                        >
+                            {slot.letter ? (
+                                <div 
+                                    // This div inside the slot is also clickable to move letter back to pool
+                                    onClick={(e) => { e.stopPropagation(); handleScrambleSlotClick(slot, index); }} // Prevent event bubbling to parent slot div
+                                    className="scramble-letter-item w-full h-full flex items-center justify-center"
+                                >
+                                    {slot.letter.letter.toUpperCase()}
+                                </div>
+                            ) : '_'}
+                        </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={handleScrambleCheck}
+                    disabled={scrambleCorrect !== null || targetSlots.some(slot => slot.letter === null)} // Disable if already checked or not all slots filled
+                    className={`px-8 py-4 rounded-full font-semibold text-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 mb-6
+                      ${scrambleCorrect === null && targetSlots.every(slot => slot.letter !== null)
+                        ? 'bg-purple-500 hover:bg-purple-600 text-white'
+                        : 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-75'
+                      }`}
+                  >
+                    <i className="fas fa-check-circle mr-2"></i> Kiểm tra
+                  </button>
+
+                  {scrambleCorrect !== null && (
+                    <div className="mt-4 text-center flex flex-col items-center">
+                      {scrambleCorrect ? (
+                        <p className="text-xl md:text-2xl font-bold mb-4 text-green-700">Chính xác! 🎉</p>
+                      ) : (
+                        <p className="text-xl md:text-2xl font-bold mb-4 text-red-700">
+                            Sai rồi! Đáp án đúng là: <span className="font-extrabold text-blue-700">{currentWord.english}</span> 😅
+                        </p>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                        <button
+                          onClick={speakWord}
+                          className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-indigo-500 text-white shadow-lg hover:bg-indigo-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                        >
+                          <i className="fas fa-volume-up mr-2"></i> Nghe lại từ đúng
+                        </button>
+                        <button
+                          onClick={nextGameQuestion}
+                          className="px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                        >
+                          Câu hỏi tiếp theo <i className="fas fa-arrow-right ml-2"></i>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                   <p className="text-lg md:text-xl font-semibold text-gray-700 mt-6">
+                    Điểm: {gameProgress.letter_scramble.score} / {gameProgress.letter_scramble.totalQuestions}
+                  </p>
+                   <button
+                    onClick={resetGame}
+                    className="mt-4 px-5 py-2 sm:px-6 sm:py-3 rounded-full font-semibold text-base sm:text-lg bg-gray-500 text-white shadow-lg hover:bg-gray-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                  >
+                    <i className="fas fa-redo mr-2"></i> Chơi lại Sắp Xếp Chữ Cái
+                  </button>
+                </div>
+              ) : (
+                // Flashcard Mode UI
+                <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105">
+                  {(() => {
+                    const isColorWord = colorWords.includes(currentWord.english);
+                    const textColor = (currentWord.english === 'Black' || currentWord.english === 'Purple' || currentWord.english === 'Brown') ? 'white' : 'black';
+                    return (
+                      <div
+                        className={`flex items-center justify-center w-full max-w-[200px] sm:max-w-[250px] md:max-w-[300px] aspect-square rounded-xl mb-6 border-4 shadow-lg
+                          ${isColorWord ? 'border-transparent' : 'border-purple-400'}
+                        `}
+                        style={isColorWord ? { backgroundColor: colorMap[currentWord.english], color: textColor } : {}}
+                      >
+                        <span className={`font-bold text-center px-2 select-none ${isColorWord ? 'text-2xl sm:text-3xl md:text-4xl uppercase' : 'text-4xl sm:text-5xl md:text-6xl text-gray-700'}`}>
+                          {currentWord.english}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
+                  <p className="text-4xl sm:text-5xl lg:text-7xl font-bold text-gray-800 mb-2 select-none tracking-wide">
+                    {currentWord.english}
+                  </p>
+
+                  <p className="text-xl sm:text-2xl lg:text-4xl text-gray-600 mb-6 select-none italic">
+                    {currentWord.vietnamese}
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 md:space-x-6 w-full justify-center">
+                    <button
+                      onClick={prevWord}
+                      className="flex items-center px-6 py-3 md:px-8 md:py-4 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold text-lg md:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-6 w-6 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Trước
+                    </button>
+
+                    <button
+                      onClick={speakWord}
+                      disabled={!isSpeechReady}
+                      className="flex items-center px-6 py-3 md:px-8 md:py-4 bg-green-500 hover:bg-green-600 text-white font-semibold text-lg md:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-6 w-6 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M17.293 13.293A8 8 0 0120 10a8 8 0 01-2.707-6.707A8 8 0 0012 4c-3.111 0-5.69 1.769-6.494 4.195l-.161.493a8 8 0 00-2.455 3.313A8 8 0 0012 16c3.111 0 5.69-1.769 6.494-4.195l.161-.493a8 8 0 002.455-3.313z"
+                        />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 13H7V9h2a2 2 0 012 2v2a2 2 0 01-2 2z" />
+                      </svg>
+                      Nghe
+                    </button>
+
+                    <button
+                      onClick={nextWord}
+                      className="flex items-center px-6 py-3 md:px-8 md:py-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-lg md:text-xl rounded-full shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-300"
+                    >
+                      Tiếp theo
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-6 w-6 ml-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               )}
-
-              <p className="text-gray-700 text-xs sm:text-sm mt-8 opacity-75">
-                &copy; 2025 Trang Web Học Tiếng Anh. Dành cho các bé.
+            </>
+          ) : (
+            <div className="text-xl text-gray-700">Đang tải từ vựng...</div>
+          )}
+        </>
+      ) : (
+        // Progress Page UI
+        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 lg:p-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col items-center transform transition-transform duration-300 hover:scale-105 border-4 border-green-200">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-700 mb-6 text-center">
+            Tiến Độ Học Tập <i className="fas fa-chart-pie ml-2 text-orange-400"></i>
+          </h2>
+          <div className="text-center mb-8 bg-blue-50 p-4 rounded-xl shadow-inner w-full">
+            <p className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
+              Tổng số câu đúng: <span className="text-green-600">{overallScore}</span>
+            </p>
+            <p className="text-2xl md:text-3xl font-bold text-gray-800">
+              Tổng số câu đã thử: <span className="text-blue-600">{overallTotalQuestions}</span>
+            </p>
+            {overallTotalQuestions > 0 && (
+              <p className="text-xl md:text-2xl font-bold text-gray-700 mt-4">
+                Tỷ lệ đúng: <span className="font-extrabold text-purple-600">{(overallScore / overallTotalQuestions * 100).toFixed(2)}%</span>
               </p>
-            </div>
-          );
-        }
+            )}
+            {overallTotalQuestions === 0 && (
+              <p className="text-lg text-gray-500 mt-4">
+                Hãy bắt đầu chơi để xem tiến độ của bạn!
+              </p>
+            )}
+          </div>
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-    </script>
-</body>
-</html>
+          <h3 className="text-2xl font-bold text-gray-700 mt-6 mb-4">Tiến độ chi tiết theo trò chơi</h3>
+          <div className="w-full flex flex-col items-center gap-3">
+            {Object.entries(gameProgress).map(([gameName, progress]) => (
+              <div key={gameName} className="w-full p-3 rounded-lg shadow-md flex flex-col bg-gray-100 border-l-4 border-gray-300">
+                <span className="font-bold text-lg md:text-xl capitalize text-gray-800 mb-1">
+                  {gameName.replace('_', ' ')}:
+                </span>
+                <span className="text-base md:text-lg text-gray-700">
+                  Đúng: <span className="font-semibold text-green-600">{progress.score}</span> / Thử: <span className="font-semibold text-blue-600">{progress.totalQuestions}</span>
+                  {progress.totalQuestions > 0 && (
+                    <span className="ml-2 text-sm text-gray-600">({(progress.score / progress.totalQuestions * 100).toFixed(1)}%)</span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <h3 className="text-2xl font-bold text-gray-700 mt-8 mb-4">Thành tích của bạn</h3>
+          <div className="w-full flex flex-col items-center gap-3">
+            <div className={`w-full p-3 rounded-lg shadow-md flex items-center justify-between text-lg md:text-xl font-semibold
+              ${firstCorrectAchievement ? 'bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500' : 'bg-gray-100 text-gray-500'}`}>
+              <span>
+                <i className={`fas fa-star mr-2 ${firstCorrectAchievement ? 'text-yellow-500' : 'text-gray-400'}`}></i> Câu trả lời đúng đầu tiên
+              </span>
+              {firstCorrectAchievement && <i className="fas fa-check-circle text-green-500 ml-2"></i>}
+            </div>
+            <div className={`w-full p-3 rounded-lg shadow-md flex items-center justify-between text-lg md:text-xl font-semibold
+              ${tenCorrectAchievement ? 'bg-purple-100 text-purple-800 border-l-4 border-purple-500' : 'bg-gray-100 text-gray-500'}`}>
+              <span>
+                <i className={`fas fa-medal mr-2 ${tenCorrectAchievement ? 'text-purple-500' : 'text-gray-400'}`}></i> 10 câu trả lời đúng
+              </span>
+              {tenCorrectAchievement && <i className="fas fa-check-circle text-green-500 ml-2"></i>}
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4 w-full justify-center mt-8">
+            <button
+              onClick={resetAllProgress}
+              className="px-6 py-3 rounded-full font-semibold text-lg bg-red-500 text-white shadow-lg hover:bg-red-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+            >
+              <i className="fas fa-eraser mr-2"></i> Đặt Lại Tiến Độ
+            </button>
+            <button
+              onClick={() => setViewMode('game')}
+              className="px-6 py-3 rounded-full font-semibold text-lg bg-blue-500 text-white shadow-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 active:scale-95"
+            >
+              <i className="fas fa-play-circle mr-2"></i> Quay Lại Trò Chơi
+            </button>
+          </div>
+          {/* Display active passcode for user to identify */}
+          {activePasscode && (
+            <p className="text-gray-600 text-sm mt-4 text-center break-all">
+              Passcode hiện tại: <span className="font-mono text-gray-800">{activePasscode}</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      <p className="text-gray-700 text-xs sm:text-sm mt-8 opacity-75">
+        &copy; 2025 Trang Web Học Tiếng Anh. Dành cho các bé.
+      </p>
+    </div>
+  );
+}
+
+export default App;
