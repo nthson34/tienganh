@@ -62,34 +62,33 @@
           animation: shake-once 0.5s ease-in-out;
       }
 
-      /* Styles for Letter Scramble Game */
-      .draggable-letter {
+      /* Styles for Letter Scramble Game (Click-based) */
+      .scramble-letter-item {
         display: flex;
         align-items: center;
         justify-content: center;
-        cursor: grab; /* Indicate draggable */
-        user-select: none; /* Prevent text selection during drag */
-        touch-action: none; /* Prevent default touch scrolling/zooming */
+        cursor: pointer; /* Indicate clickable */
+        user-select: none; /* Prevent text selection */
       }
-      .draggable-letter:active {
-        cursor: grabbing;
+      .scramble-letter-item.selected {
+          border: 4px solid #FCD34D; /* Yellow ring for selected letter */
+          transform: scale(1.1); /* Slightly enlarge when selected */
+          box-shadow: 0 0 15px rgba(252, 211, 77, 0.6); /* Yellow glow */
       }
-      .draggable-letter.is-dragging {
-          opacity: 0.5; /* Visual feedback when dragging */
-          border: 2px dashed #63b3ed;
-      }
-      .drop-zone {
-        border: 2px dashed #999; /* Darker dashed border for clarity */
+      .scramble-drop-zone {
+        border: 2px dashed #999; /* Dashed border for empty slots */
         background-color: #f0f4f8; /* Light blueish background for empty slots */
         font-size: 2.5rem; /* Larger font size for _ */
         color: #777; /* Gray color for _ */
         transition: background-color 0.2s ease, border-color 0.2s ease;
+        cursor: pointer; /* Indicate clickable */
+        user-select: none;
       }
-      .drop-zone.drag-over {
-        background-color: #cfe2f3; /* Lighter blue on drag over */
-        border-color: #63b3ed; /* Blue border on drag over */
+      .scramble-drop-zone.active-target { /* Highlight when a letter is selected and this is a potential target */
+        background-color: #cfe2f3; /* Lighter blue on hover */
+        border-color: #63b3ed; /* Blue border on hover */
       }
-      .drop-zone.filled {
+      .scramble-drop-zone.filled {
         border: 2px solid #66bb6a; /* Green border when filled */
         background-color: #e6ffe6; /* Very light green when filled */
         color: #1a202c; /* Dark text for readability */
@@ -304,13 +303,11 @@
           const [matchedPairs, setMatchedPairs] = useState(0); // Count of matched pairs
           const [matchingGameComplete, setMatchingGameComplete] = useState(false);
 
-          // Letter Scramble Game states (Drag and Drop)
+          // Letter Scramble Game states (Click-based)
           const [scrambledLetters, setScrambledLetters] = useState([]); // Array of {id, letter, originalIndex} for available letters
           const [targetSlots, setTargetSlots] = useState([]); // Array of {id, letter} for drop targets
           const [scrambleCorrect, setScrambleCorrect] = useState(null);
-          const [draggedLetterData, setDraggedLetterData] = useState(null); // The letter object being dragged
-          const [dragSource, setDragSource] = useState(null); // 'pool' or 'slot-X'
-          const [currentDragOverElement, setCurrentDragOverElement] = useState(null); // For touch drag visual feedback
+          const [selectedScrambleLetter, setSelectedScrambleLetter] = useState(null); // The letter object currently selected by click
 
 
           const currentWord = shuffledVocabulary[currentShuffledIndex];
@@ -639,7 +636,7 @@
           }, [matchedPairs, matchingCards.length]);
 
 
-          // Letter Scramble Game Functions (Drag and Drop implementation)
+          // Letter Scramble Game Functions (Click-based implementation)
           const generateScrambledWord = (wordObject) => {
             if (!wordObject) return;
             const word = wordObject.english;
@@ -651,210 +648,64 @@
             setScrambledLetters(scrambled);
             setTargetSlots(Array(word.length).fill(null).map((_, index) => ({ id: `slot-${index}`, letter: null, originalIndex: index })));
             setScrambleCorrect(null); // Reset correctness for new word
-            setDraggedLetterData(null); // Reset dragged letter
-            setDragSource(null); // Reset drag source
-            setCurrentDragOverElement(null); // Reset drag over element
+            setSelectedScrambleLetter(null); // Reset selected letter
           };
 
-          const handleDragStart = (e, letterData, source) => {
-            // Set data for native drag-and-drop API
-            e.dataTransfer.setData("letterId", letterData.id); 
-            e.dataTransfer.effectAllowed = 'move';
-            
-            // Set states for React logic and visual feedback
-            setDraggedLetterData(letterData);
-            setDragSource(source);
-            setScrambleCorrect(null); // Reset correctness feedback
-            e.currentTarget.classList.add('is-dragging'); // Add visual feedback
+          // Handle click on letters in the scramble pool
+          const handleScrambleLetterClick = (clickedLetter) => {
+              // If there's already a selected letter, and it's THIS letter, deselect it
+              if (selectedScrambleLetter && selectedScrambleLetter.id === clickedLetter.id) {
+                  setSelectedScrambleLetter(null);
+                  // Put the letter back to the scrambled pool
+                  setScrambledLetters(prevLetters => [...prevLetters, clickedLetter].sort((a,b) => a.originalIndex - b.originalIndex)); // Re-sort to maintain original order in pool
+              } else {
+                  // Deselect any currently selected letter and put it back to the pool
+                  if (selectedScrambleLetter) {
+                      setScrambledLetters(prevLetters => [...prevLetters, selectedScrambleLetter].sort((a,b) => a.originalIndex - b.originalIndex));
+                  }
+                  // Select the new letter and remove it from the scrambled pool (handled by state logic)
+                  setSelectedScrambleLetter(clickedLetter);
+                  setScrambledLetters(prevLetters => prevLetters.filter(l => l.id !== clickedLetter.id));
+              }
+              setScrambleCorrect(null); // Reset correctness feedback
           };
 
-          const handleDragOver = (e) => {
-            e.preventDefault(); // Necessary to allow drop
-            e.dataTransfer.dropEffect = 'move';
-            e.currentTarget.classList.add('drag-over'); // Add visual feedback for drop zone
-            setCurrentDragOverElement(e.currentTarget); // Track current element being dragged over
+          // Handle click on target slots
+          const handleScrambleSlotClick = (clickedSlot, index) => {
+              // If a letter is selected from the pool
+              if (selectedScrambleLetter) {
+                  // If the slot is empty, place the selected letter into it
+                  if (!clickedSlot.letter) {
+                      setTargetSlots(prevSlots => prevSlots.map(s =>
+                          s.id === clickedSlot.id ? { ...s, letter: selectedScrambleLetter } : s
+                      ));
+                      setSelectedScrambleLetter(null); // Clear selected letter
+                  } else {
+                      // If the slot is already filled, move its current letter back to the scrambled letters pool
+                      // and then place the selected letter into the slot.
+                      const letterInSlot = clickedSlot.letter;
+                      
+                      // Put the letter from the slot back to the scrambled pool
+                      setScrambledLetters(prevLetters => [...prevLetters, letterInSlot].sort((a,b) => a.originalIndex - b.originalIndex));
+
+                      // Place the new selected letter into the clicked slot
+                      setTargetSlots(prevSlots => prevSlots.map(s =>
+                          s.id === clickedSlot.id ? { ...s, letter: selectedScrambleLetter } : s
+                      ));
+                      setSelectedScrambleLetter(null); // Clear selected letter
+                  }
+              } else if (clickedSlot.letter) {
+                  // If no letter is selected from the pool, but a letter is in the clicked slot,
+                  // move the letter from the slot back to the scrambled letters pool.
+                  const letterToMoveBack = clickedSlot.letter;
+                  setScrambledLetters(prevLetters => [...prevLetters, letterToMoveBack].sort((a,b) => a.originalIndex - b.originalIndex));
+                  setTargetSlots(prevSlots => prevSlots.map(s =>
+                      s.id === clickedSlot.id ? { ...s, letter: null } : s
+                  ));
+              }
+              // Always clear scramble correctness feedback when interacting
+              setScrambleCorrect(null);
           };
-
-          const handleDragLeave = (e) => {
-            e.currentTarget.classList.remove('drag-over'); // Remove visual feedback when leaving
-            setCurrentDragOverElement(null);
-          };
-
-          // Unified drop logic for both native drag and touch emulation
-          const handleDrop = (e, targetLocation, targetIndex = null, droppedLetter = null, sourceOrigin = null) => {
-            if (e) { // If it's a native drag event, prevent default
-                e.preventDefault();
-                e.currentTarget.classList.remove('drag-over');
-                setCurrentDragOverElement(null);
-            }
-
-            const letterToDrop = droppedLetter || draggedLetterData;
-            const currentOrigin = sourceOrigin || dragSource;
-
-            if (!letterToDrop) return; // No letter being dragged/dropped
-
-            let newTargetSlots = [...targetSlots];
-            let newScrambledLetters = [...scrambledLetters];
-            
-            const currentLetterInTargetSlot = (targetLocation === 'slot' && targetIndex !== null) ? newTargetSlots[targetIndex].letter : null;
-
-            // Step 1: Remove letter from its original source
-            if (currentOrigin === 'pool') {
-                newScrambledLetters = newScrambledLetters.filter(l => l.id !== letterToDrop.id);
-            } else if (currentOrigin && currentOrigin.startsWith('slot-')) {
-                const sourceSlotIndex = parseInt(currentOrigin.split('-')[1]);
-                if (targetLocation === 'slot' && sourceSlotIndex === targetIndex) {
-                    // Dropping onto the same slot it came from, do nothing to source
-                } else {
-                    newTargetSlots[sourceSlotIndex] = { ...newTargetSlots[sourceSlotIndex], letter: null };
-                }
-            }
-
-            // Step 2: Place letter into new target or return to pool
-            if (targetLocation === 'pool') {
-                // Ensure it's not already in the pool to prevent duplicates if dragged from slot to slot
-                if (!newScrambledLetters.some(l => l.id === letterToDrop.id)) {
-                    newScrambledLetters.push(letterToDrop);
-                }
-            } else if (targetLocation === 'slot' && targetIndex !== null) {
-                // If target slot was filled, move its current letter back to the pool
-                if (currentLetterInTargetSlot) {
-                    newScrambledLetters.push(currentLetterInTargetSlot);
-                }
-                newTargetSlots[targetIndex] = { ...newTargetSlots[targetIndex], letter: letterToDrop };
-            }
-
-            // Step 3: Sort scrambled letters after all moves
-            newScrambledLetters.sort((a, b) => a.originalIndex - b.originalIndex);
-
-            setTargetSlots(newTargetSlots);
-            setScrambledLetters(newScrambledLetters);
-            setDraggedLetterData(null); // Clear dragged item state
-            setDragSource(null); // Clear drag source
-            setScrambleCorrect(null); // Clear correctness feedback
-          };
-
-          // Touch events emulation for drag-and-drop
-          const touchDragStartTimeout = useRef(null); // To differentiate tap from drag
-          const touchStartingPoint = useRef({ x: 0, y: 0 }); // To track initial touch position
-
-          const handleTouchStart = (e, letterData, source) => {
-            e.preventDefault(); // Prevent scrolling and other default touch behaviors immediately
-
-            // Store starting touch position
-            touchStartingPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-
-            // Use a timeout to determine if it's a drag or a tap
-            touchDragStartTimeout.current = setTimeout(() => {
-                // If touch hasn't moved much, it's a tap, don't start drag
-                startDrag(letterData, source); // Set states for React logic and visual feedback
-                e.currentTarget.classList.add('is-dragging'); // Add visual feedback
-            }, 100); // Small delay to allow for taps vs. drags
-          };
-
-          const handleTouchMove = (e) => {
-            e.preventDefault(); // Prevent scrolling
-            if (!draggedLetterData) return; // Only process if a drag has officially started
-
-            const clientX = e.touches[0].clientX;
-            const clientY = e.touches[0].clientY;
-
-            // Find element under touch
-            const elementUnderTouch = document.elementFromPoint(clientX, clientY);
-            
-            // Remove 'drag-over' from previously highlighted element
-            if (currentDragOverElement && currentDragOverElement !== elementUnderTouch) {
-                currentDragOverElement.classList.remove('drag-over');
-            }
-
-            // Add 'drag-over' to new target if it's a drop-zone
-            if (elementUnderTouch && (elementUnderTouch.classList.contains('drop-zone') || elementUnderTouch.closest('.flex-wrap.justify-center.gap-2.sm\\:gap-3.mb-6.p-3.bg-blue-50.rounded-lg.shadow-inner'))) {
-                elementUnderTouch.classList.add('drag-over');
-                setCurrentDragOverElement(elementUnderTouch);
-            } else {
-                setCurrentDragOverElement(null);
-            }
-          };
-
-          const handleTouchEnd = (e) => {
-            e.preventDefault();
-            clearTimeout(touchDragStartTimeout.current); // Clear any pending drag start timeout
-
-            const clientX = e.changedTouches[0].clientX;
-            const clientY = e.changedTouches[0].clientY;
-
-            const finalDropElement = document.elementFromPoint(clientX, clientY);
-
-            // Clean up all 'is-dragging' and 'drag-over' classes globally
-            const draggingElements = document.querySelectorAll('.is-dragging');
-            draggingElements.forEach(el => el.classList.remove('is-dragging'));
-            const dragOverElements = document.querySelectorAll('.drag-over');
-            dragOverElements.forEach(el => el.classList.remove('drag-over'));
-            setCurrentDragOverElement(null); // Clear state for visual feedback
-
-            if (!draggedLetterData) {
-                // If no letter was being actively dragged (e.g., it was just a tap)
-                return;
-            }
-
-            // Determine drop target (slot or pool)
-            let dropTargetLocation = null;
-            let dropTargetIndex = null;
-
-            if (finalDropElement) {
-                if (finalDropElement.classList.contains('drop-zone')) {
-                    dropTargetLocation = 'slot';
-                    const slotId = finalDropElement.id; // Assuming drop-zone has an id like 'slot-X'
-                    dropTargetIndex = parseInt(slotId.replace('slot-', ''));
-                } else if (finalDropElement.closest('.flex-wrap.justify-center.gap-2.sm\\:gap-3.mb-6.p-3.bg-blue-50.rounded-lg.shadow-inner')) {
-                    // This is the letter pool div
-                    dropTargetLocation = 'pool';
-                }
-            }
-
-            // Execute drop logic or return letter to source if no valid target
-            if (dropTargetLocation) {
-                handleDrop(null, dropTargetLocation, dropTargetIndex, draggedLetterData, dragSource);
-            } else {
-                // If dropped nowhere, return the dragged letter to its original source
-                let newTargetSlots = [...targetSlots];
-                let newScrambledLetters = [...scrambledLetters];
-
-                if (dragSource === 'pool') {
-                    newScrambledLetters.push(draggedLetterData);
-                    newScrambledLetters.sort((a,b) => a.originalIndex - b.originalIndex);
-                } else if (dragSource.startsWith('slot-')) {
-                    const sourceSlotIndex = parseInt(dragSource.split('-')[1]);
-                    newTargetSlots[sourceSlotIndex] = { ...newTargetSlots[sourceSlotIndex], letter: draggedLetterData };
-                }
-                setTargetSlots(newTargetSlots);
-                setScrambledLetters(newScrambledLetters);
-            }
-
-            // Reset drag states after processing touch end
-            setDraggedLetterData(null);
-            setDragSource(null);
-            setScrambleCorrect(null);
-          };
-
-          // Native dragend event listener (for when drag ends outside any drop target)
-          const handleGlobalDragEnd = (e) => {
-            const draggingElements = document.querySelectorAll('.is-dragging');
-            draggingElements.forEach(el => el.classList.remove('is-dragging'));
-            const dragOverElements = document.querySelectorAll('.drag-over');
-            dragOverElements.forEach(el => el.classList.remove('drag-over'));
-            setCurrentDragOverElement(null);
-            setDraggedLetterData(null);
-            setDragSource(null);
-          };
-
-          useEffect(() => {
-            document.addEventListener('dragend', handleGlobalDragEnd);
-            return () => {
-                document.removeEventListener('dragend', handleGlobalDragEnd);
-            };
-          }, []);
-
 
           const handleScrambleCheck = () => {
             if (!currentWord) return;
@@ -878,7 +729,7 @@
                     }
                 }));
             }
-            setDraggedLetterData(null); // Clear any selected letter after checking
+            setSelectedScrambleLetter(null); // Clear any selected letter after checking
           };
 
           // Unified effect for handling word changes within game modes (next/prev button clicks)
@@ -907,9 +758,7 @@
             setFillInBlanksInput('');
             setFillInBlanksCorrect(null);
             setScrambleCorrect(null);
-            setDraggedLetterData(null); // Ensure no letter is selected/dragged from previous round
-            setDragSource(null);
-            setCurrentDragOverElement(null);
+            setSelectedScrambleLetter(null); // Ensure no letter is selected from previous round
           }, [currentShuffledIndex, gameMode, currentWord, viewMode]);
 
 
@@ -1006,9 +855,7 @@
             setFillInBlanksCorrect(null);
             setMatchingGameComplete(false);
             setScrambleCorrect(null);
-            setDraggedLetterData(null); // Ensure no selected letter on reset
-            setDragSource(null);
-            setCurrentDragOverElement(null);
+            setSelectedScrambleLetter(null); // Ensure no selected letter on reset
           };
 
           const nextGameQuestion = () => {
@@ -1025,9 +872,7 @@
             setFillInBlanksCorrect(null);
             setMatchingGameComplete(false);
             setScrambleCorrect(null);
-            setDraggedLetterData(null); // Reset dragged letter when changing mode
-            setDragSource(null);
-            setCurrentDragOverElement(null);
+            setSelectedScrambleLetter(null); // Reset selected letter when changing mode
 
             const newCurrentWord = shuffleAndSetNewWord();
 
@@ -1532,53 +1377,42 @@
                             "{currentWord.vietnamese}"
                           </p>
 
-                          {/* Draggable Letters Pool */}
+                          {/* Clickable Letters Pool */}
                           <div 
                               className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6 p-3 bg-blue-50 rounded-lg shadow-inner w-full min-h-[70px]"
-                              onDragOver={handleDragOver}
-                              onDrop={(e) => handleDrop(e, 'pool')}
-                              onTouchMove={handleTouchMove} 
-                              onTouchEnd={handleTouchEnd} 
                           >
                             {scrambledLetters.map((item) => (
                                 <div
                                     key={item.id}
-                                    draggable="true"
-                                    onDragStart={(e) => handleDragStart(e, item, 'pool')}
-                                    onTouchStart={(e) => handleTouchStart(e, item, 'pool')} 
-                                    className={`draggable-letter px-4 py-2 bg-blue-400 text-white font-bold text-xl sm:text-2xl rounded-lg shadow-md transition-all duration-200 hover:bg-blue-500 transform hover:scale-105
-                                        ${draggedLetterData && draggedLetterData.id === item.id ? 'is-dragging' : ''}`}
+                                    onClick={() => handleScrambleLetterClick(item)}
+                                    className={`scramble-letter-item px-4 py-2 bg-blue-400 text-white font-bold text-xl sm:text-2xl rounded-lg shadow-md transition-all duration-200 hover:bg-blue-500 transform hover:scale-105
+                                        ${selectedScrambleLetter && selectedScrambleLetter.id === item.id ? 'selected' : ''}` // Visual feedback for selected
+                                    }
                                 >
                                     {item.letter.toUpperCase()}
                                 </div>
                             ))}
-                            {scrambledLetters.length === 0 && !draggedLetterData && (
-                                <p className="text-gray-400 text-sm italic">Kéo chữ cái từ ô đã điền về đây</p>
+                            {scrambledLetters.length === 0 && !selectedScrambleLetter && (
+                                <p className="text-gray-400 text-sm italic">Chọn chữ cái từ ô đã điền để chuyển về đây</p>
                             )}
                           </div>
 
-                          {/* Drop Zones (Target Slots) */}
+                          {/* Clickable Drop Zones (Target Slots) */}
                           <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-6">
                             {targetSlots.map((slot, index) => (
                                 <div
                                     key={slot.id}
-                                    onDragOver={handleDragOver}
-                                    onDrop={(e) => handleDrop(e, 'slot', index)}
-                                    onDragLeave={handleDragLeave}
-                                    onTouchMove={handleTouchMove} 
-                                    onTouchEnd={handleTouchEnd} 
-                                    className={`drop-zone w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center rounded-lg text-2xl sm:text-3xl font-bold
+                                    onClick={() => handleScrambleSlotClick(slot, index)}
+                                    className={`scramble-drop-zone w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center rounded-lg text-2xl sm:text-3xl font-bold
                                         ${slot.letter ? 'bg-green-100 border-green-500 filled' : ''} 
-                                        ${currentDragOverElement && currentDragOverElement.id === slot.id ? 'drag-over' : ''}` // Uses currentDragOverElement state for consistency
+                                        ${selectedScrambleLetter && !slot.letter ? 'active-target' : ''}` // Visual feedback for available target
                                     }
                                 >
                                     {slot.letter ? (
                                         <div 
-                                            draggable="true"
-                                            onDragStart={(e) => handleDragStart(e, slot.letter, `slot-${index}`)}
-                                            onTouchStart={(e) => handleTouchStart(e, slot.letter, `slot-${index}`)} 
-                                            className={`draggable-letter w-full h-full flex items-center justify-center
-                                                ${draggedLetterData && draggedLetterData.id === slot.letter.id ? 'is-dragging' : ''}`}
+                                            // This div inside the slot is also clickable to move letter back to pool
+                                            onClick={(e) => { e.stopPropagation(); handleScrambleSlotClick(slot, index); }} // Prevent event bubbling to parent slot div
+                                            className="scramble-letter-item w-full h-full flex items-center justify-center"
                                         >
                                             {slot.letter.letter.toUpperCase()}
                                         </div>
