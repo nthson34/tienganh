@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>English Speaking Practice</title>
 
-<!-- FONT CHO TRẺ EM -->
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap" rel="stylesheet">
 
 <style>
 :root{
@@ -33,7 +32,6 @@ h1{
   text-align:center;
   color:var(--primary);
   font-size:28px;
-  margin-bottom:6px;
 }
 .note{
   text-align:center;
@@ -55,7 +53,7 @@ select{
   border:2px solid #eee;
 }
 .question{
-  font-size:22px;
+  font-size:24px;
   font-weight:800;
   line-height:1.4;
 }
@@ -65,7 +63,7 @@ select{
   padding-top:12px;
   border-top:1px dashed #ccc;
   color:#2E7D32;
-  font-size:20px;
+  font-size:22px;
   font-weight:700;
   line-height:1.5;
   white-space:pre-line;
@@ -82,7 +80,7 @@ select{
   padding:14px;
   border-radius:16px;
   font-size:18px;
-  font-weight:700;
+  font-weight:800;
 }
 .listen{background:#FFD93D;}
 .listenAnswer{background:#4FC3F7;color:white;}
@@ -96,7 +94,7 @@ select{
 
 <div class="container">
 <h1>🎈 English Speaking</h1>
-<div class="note">Nghe chậm – Bé nói – Nghe lại – Nói theo</div>
+<div class="note">Nghe từng chữ → Bé nhắc lại → Nghe lại</div>
 
 <select id="unitSelect"></select>
 
@@ -120,14 +118,14 @@ select{
 
 <script>
 // ==================
-// DATA – GIỮ NGUYÊN
+// DATA (GIỮ NGUYÊN)
 // ==================
 const data = [
 {
   name:"Unit 1: My Friend",
   q:[
     ["How do you spell your name?","It’s V – I."],
-    ["Where are you from?","I’m from Viet Nam."],
+    ["Where are you from?","I’m from Cần Thơ."],
     ["Do your friends like dancing?","Yes, they do."]
   ]
 },
@@ -135,7 +133,7 @@ const data = [
   name:"Unit 2: Family",
   q:[
     ["Who is this?","This is my mother."],
-    ["What’s her name?","Her name is Chi."],
+    ["What’s her name?","Her name is Lan."],
     ["Do you have a pet?","Yes, I do. I have a cat."]
   ]
 },
@@ -151,34 +149,52 @@ const data = [
 {
   name:"Unit 4: Home",
   q:[
-    ["Where’s your dad?","He is in the bedroom."],
+    ["Where’s your dad?","He is in the living room."],
     ["What’s he doing?","He is watching TV."],
-    ["Who do you live with?","I live with mom, dad."],
+    ["Who do you live with?","I live with my mom and dad."],
     ["How many rooms are there in your house?","There are four rooms."]
   ]
 }
 ];
 
 // ==================
-// GIỌNG NỮ CHÂU Á – TỐC ĐỘ CHẬM
+// GIỌNG + ĐỌC TỪNG CHỮ
 // ==================
 let voices=[], selectedVoice=null;
 
 function loadVoices(){
   voices = speechSynthesis.getVoices();
-  const priority = [
-    v => v.lang.startsWith("en-SG"),
-    v => v.lang.startsWith("en-IN"),
-    v => v.lang.startsWith("en-HK"),
-    v => v.lang.startsWith("en-JP"),
-    v => v.lang.startsWith("en-US")
-  ];
-  for(const rule of priority){
-    selectedVoice = voices.find(v => rule(v));
-    if(selectedVoice) break;
-  }
+  selectedVoice =
+    voices.find(v => v.lang.startsWith("en-SG")) ||
+    voices.find(v => v.lang.startsWith("en-IN")) ||
+    voices.find(v => v.lang.startsWith("en-US")) ||
+    voices[0];
 }
 speechSynthesis.onvoiceschanged = loadVoices;
+
+// ĐỌC TỪNG TỪ – CÓ NGẮT
+function speakSlowWords(text){
+  speechSynthesis.cancel();
+  const words = text.split(" ");
+  let index = 0;
+
+  function speakNext(){
+    if(index >= words.length) return;
+
+    const u = new SpeechSynthesisUtterance(words[index]);
+    u.lang = "en";
+    u.rate = 0.45;   // 🔥 RẤT CHẬM
+    u.pitch = 0.9;   // 🔥 KHÔNG LUYẾN
+    if(selectedVoice) u.voice = selectedVoice;
+
+    u.onend = () => {
+      index++;
+      setTimeout(speakNext, 450); // 🔥 NGẮT GIỮA CÁC TỪ
+    };
+    speechSynthesis.speak(u);
+  }
+  speakNext();
+}
 
 // ==================
 // APP LOGIC
@@ -200,18 +216,8 @@ function render(){
   answerEl.style.display="none";
 }
 
-function speakText(text){
-  speechSynthesis.cancel();
-  const s=new SpeechSynthesisUtterance(text);
-  s.lang="en";
-  s.rate=0.6;   // 🔥 TỐC ĐỘ CHẬM – PHÙ HỢP TRẺ EM
-  s.pitch=1;
-  if(selectedVoice) s.voice=selectedVoice;
-  speechSynthesis.speak(s);
-}
-
-function speakQuestion(){ speakText(data[u].q[i][0]); }
-function speakAnswer(){ speakText(data[u].q[i][1]); }
+function speakQuestion(){ speakSlowWords(data[u].q[i][0]); }
+function speakAnswer(){ speakSlowWords(data[u].q[i][1]); }
 
 function toggle(){
   answerEl.style.display =
@@ -225,4 +231,3 @@ render();
 
 </body>
 </html>
-
