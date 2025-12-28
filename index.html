@@ -9,114 +9,115 @@
 
 <style>
 :root{
-  --primary:#FF6B6B;
-  --secondary:#4ECDC4;
-  --accent:#FFD93D;
-  --bg:#F0F7F4;
+  --primary: #FF6B6B;
+  --secondary: #4ECDC4;
+  --accent: #FFD93D;
+  --bg: #F0F7F4;
 }
 body{
-  margin:0;
-  padding:15px;
-  font-family:'Nunito', sans-serif;
-  background:var(--bg);
+  margin: 0;
+  padding: 15px;
+  font-family: 'Nunito', sans-serif;
+  background: var(--bg);
   color: #2D3436;
+  user-select: none;
 }
 .container{
-  max-width:500px;
-  margin:auto;
-  background:#fff;
-  border-radius:32px;
-  padding:25px;
-  border:6px solid var(--secondary);
-  box-shadow:0 15px 40px rgba(0,0,0,0.08);
+  max-width: 500px;
+  margin: auto;
+  background: #fff;
+  border-radius: 32px;
+  padding: 25px;
+  border: 6px solid var(--secondary);
+  box-shadow: 0 15px 40px rgba(0,0,0,0.08);
 }
 h1{
-  text-align:center;
-  color:var(--primary);
-  font-size:30px;
-  margin-top:0;
+  text-align: center;
+  color: var(--primary);
+  font-size: 28px;
+  margin: 0 0 15px 0;
 }
 select{
-  width:100%;
-  padding:15px;
-  border-radius:20px;
-  font-size:18px;
-  border:3px solid #E0E0E0;
-  margin-bottom:15px;
-  font-family:inherit;
-  font-weight:700;
-  color: #444;
+  width: 100%;
+  padding: 14px;
+  border-radius: 18px;
+  font-size: 18px;
+  border: 3px solid #E0E0E0;
+  margin-bottom: 15px;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
 }
 .speed-box{
-  margin-bottom:20px;
-  padding:15px;
-  border-radius:20px;
-  background:#E8F9F7;
-  border:2px dashed var(--secondary);
+  margin-bottom: 20px;
+  padding: 12px;
+  border-radius: 20px;
+  background: #E8F9F7;
+  border: 2px dashed var(--secondary);
 }
-.speed-label{ font-weight:800; text-align:center; font-size:16px; margin-bottom:8px; }
-input[type=range]{ width:100%; height:10px; accent-color: var(--secondary); }
+.speed-label{ font-weight: 800; text-align: center; font-size: 16px; margin-bottom: 8px; }
+input[type=range]{ width: 100%; cursor: pointer; accent-color: var(--secondary); }
 
 .card{
-  background:#FAFAFA;
-  padding:25px;
-  border-radius:25px;
-  border:2px solid #F0F0F0;
-  min-height:180px;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-  text-align:center;
-  position:relative;
+  background: #FAFAFA;
+  padding: 25px;
+  border-radius: 25px;
+  border: 2px solid #F0F0F0;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 15px;
 }
 .question{
-  font-size:26px;
-  font-weight:800;
-  color:#333;
-  margin-bottom:15px;
-  line-height:1.3;
+  font-size: 24px;
+  font-weight: 800;
+  color: #333;
+  margin-bottom: 10px;
+  line-height: 1.4;
 }
 .answer{
-  font-size:24px;
-  font-weight:700;
-  color:#27AE60;
-  padding-top:15px;
-  border-top:2px dashed #DDD;
-  width:100%;
-  display:none; /* Sẽ điều khiển bằng JS */
+  font-size: 24px;
+  font-weight: 700;
+  color: #27AE60;
+  padding-top: 15px;
+  border-top: 2px dashed #DDD;
+  width: 100%;
+  display: none;
   animation: slideUp 0.3s ease;
 }
 @keyframes slideUp { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
 
 .btn-group{
-  display:grid;
+  display: grid;
   grid-template-columns: 1fr 1fr;
-  gap:12px;
-  margin-top:20px;
+  gap: 12px;
+  margin-top: 10px;
 }
 .btn{
-  border:none;
-  padding:18px;
-  border-radius:20px;
-  font-size:17px;
-  font-weight:800;
-  cursor:pointer;
-  transition: transform 0.1s;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+  border: none;
+  padding: 16px;
+  border-radius: 20px;
+  font-size: 17px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 5px 0 rgba(0,0,0,0.1);
 }
 .btn:active{ transform: translateY(3px); box-shadow: none; }
 
-.btn-q{ background:var(--accent); }
-.btn-a{ background:#4FC3F7; color:white; }
-.btn-show{ background:#6BCB77; color:white; grid-column: span 2; }
+.btn-q{ background: var(--accent); color: #5D4037; }
+.btn-a{ background: #4FC3F7; color: white; }
+.btn-show{ background: #6BCB77; color: white; grid-column: span 2; }
 
-.nav{ display:flex; gap:15px; margin-top:20px; }
-.btn-nav{ background:#B0BEC5; color:white; flex:1; }
-.btn-next{ background:var(--primary); color:white; flex:1.5; }
+.nav{ display: flex; gap: 12px; margin-top: 20px; }
+.btn-nav{ background: #B0BEC5; color: white; flex: 1; }
+.btn-next{ background: var(--primary); color: white; flex: 1.5; }
 </style>
 </head>
 
@@ -138,91 +139,99 @@ input[type=range]{ width:100%; height:10px; accent-color: var(--secondary); }
   </div>
 
   <div class="btn-group">
-    <button class="btn btn-q" onclick="speak('q')">🔊 Câu hỏi</button>
-    <button class="btn btn-a" onclick="speak('a')">🔊 Đáp án</button>
+    <button class="btn btn-q" onclick="handleSpeak('q')">🔊 Câu hỏi</button>
+    <button class="btn btn-a" onclick="handleSpeak('a')">🔊 Đáp án</button>
     <button class="btn btn-show" onclick="toggle()">👀 Xem đáp án</button>
   </div>
 
   <div class="nav">
     <button class="btn btn-nav" onclick="prev()">⬅️ Trước</button>
-    <button class="btn btn-next" onclick="next()">Tiếp theo ➡️</button>
+    <button class="btn btn-next" onclick="next()">Tiếp ➡️</button>
   </div>
 </div>
 
 <script>
+// ==================
+// DỮ LIỆU CÂU HỎI
+// ==================
 const data = [
   {
-    name:"Unit 1: My Friend",
-    q:[
-      ["How do you spell your name?","It’s V – I."],
-      ["Where are you from?","I’m from Cần Thơ."],
-      ["Do your friends like dancing?","Yes, they do."]
+    name: "Unit 1: My Friend",
+    q: [
+      ["How do you spell your name?", "It’s V – I."],
+      ["Where are you from?", "I’m from Can Tho."],
+      ["Do your friends like dancing?", "Yes, they do."]
     ]
   },
   {
-    name:"Unit 2: Family",
-    q:[
-      ["Who is this?","This is my mother."],
-      ["What’s her name?","Her name is Lan."],
-      ["Do you have a pet?","Yes, I do. I have a cat."]
+    name: "Unit 2: Family",
+    q: [
+      ["Who is this?", "This is my mother."],
+      ["What’s her name?", "Her name is Lan."],
+      ["Do you have a pet?", "Yes, I do. I have a cat."]
     ]
   },
   {
-    name:"Unit 3: School",
-    q:[
-      ["Is this your book?","Yes, it is."],
-      ["Are these your pens?","Yes, they are."],
-      ["Do you like English?","Yes, I do."],
-      ["When do you have English?","I have English on Monday."]
+    name: "Unit 3: School",
+    q: [
+      ["Is this your book?", "Yes, it is."],
+      ["Are these your pens?", "Yes, they are."],
+      ["Do you like English?", "Yes, I do."],
+      ["When do you have English?", "I have English on Monday."]
     ]
   },
   {
-    name:"Unit 4: Home",
-    q:[
-      ["Where’s your dad?","He is in the living room."],
-      ["What’s he doing?","He is watching TV."],
-      ["Who do you live with?","I live with my mom and dad."],
-      ["How many rooms are there in your house?","There are four rooms."]
+    name: "Unit 4: Home",
+    q: [
+      ["Where’s your dad?", "He is in the living room."],
+      ["What’s he doing?", "He is watching TV."],
+      ["Who do you live with?", "I live with my mom and dad."],
+      ["How many rooms are there?", "There are four rooms."]
     ]
   }
 ];
 
-let u=0, i=0;
+let u = 0, i = 0;
 const synth = window.speechSynthesis;
 
-// 1. CLEAN TEXT - Loại bỏ ký tự lạ để máy không đọc lỗi
+// ==================
+// XỬ LÝ PHÁT ÂM (FIX LỖI CHỮ I)
+// ==================
 function cleanForSpeech(text) {
   return text
-    .replace(/[.,?!’'":;]/g, "") // Bỏ dấu câu
-    .replace(/[–-]/g, " ")        // Biến dấu gạch nối thành khoảng trắng
-    .replace(/\s+/g, " ")         // Thu gọn khoảng trắng
+    .replace(/\bI\b/g, "eye")      // Ép máy đọc chữ "I" một mình thành "Ai" (eye)
+    .replace(/[.,?!’'":;]/g, "")   // Bỏ dấu câu
+    .replace(/[–-]/g, " ")         // Dấu gạch nối thành khoảng trắng để máy nghỉ nhịp
+    .replace(/\s+/g, " ")          // Xóa khoảng trắng thừa
     .trim();
 }
 
-// 2. SPEAK FUNCTION - Đọc rõ từng từ
-function speak(type) {
+function handleSpeak(type) {
   synth.cancel();
   const rawText = (type === 'q') ? data[u].q[i][0] : data[u].q[i][1];
   const words = cleanForSpeech(rawText).split(" ");
   
   let wordIdx = 0;
-  function speakNext() {
+  function speakWord() {
     if (wordIdx < words.length) {
       const utter = new SpeechSynthesisUtterance(words[wordIdx]);
       utter.lang = 'en-US';
       utter.rate = document.getElementById("speed").value;
-      utter.pitch = 1.1; // Chỉnh giọng cao hơn một chút cho trẻ em dễ nghe
+      utter.pitch = 1.1; // Giọng cao hơn một chút cho trẻ em
+      
       utter.onend = () => {
         wordIdx++;
-        setTimeout(speakNext, 300); // Khoảng nghỉ 0.3s giữa các từ
+        setTimeout(speakWord, 300); // Nghỉ 0.3s giữa các từ
       };
       synth.speak(utter);
     }
   }
-  speakNext();
+  speakWord();
 }
 
-// 3. APP LOGIC
+// ==================
+// LOGIC ỨNG DỤNG
+// ==================
 const unitSelect = document.getElementById("unitSelect");
 data.forEach((unit, idx) => {
   unitSelect.innerHTML += `<option value="${idx}">${unit.name}</option>`;
@@ -236,7 +245,7 @@ document.getElementById("speed").oninput = (e) => {
 function render() {
   document.getElementById("qText").innerText = data[u].q[i][0];
   document.getElementById("aText").innerText = data[u].q[i][1];
-  document.getElementById("aText").style.display = "none"; // Luôn ẩn khi chuyển câu
+  document.getElementById("aText").style.display = "none"; 
 }
 
 function toggle() {
@@ -252,7 +261,7 @@ function prev() {
   if (i > 0) { i--; render(); }
 }
 
-// Chạy lần đầu
+// Khởi động
 render();
 </script>
 
