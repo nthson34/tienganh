@@ -130,7 +130,7 @@ input[type=range]{ width: 100%; cursor: pointer; accent-color: var(--secondary);
 
   <div class="speed-box">
     <div class="speed-label">🐢 Tốc độ: <span id="speedVal">0.45</span></div>
-    <input type="range" id="speed" min="0.3" max="0.7" step="0.05" value="0.45">
+    <input type="range" id="speed" min="0.3" max="1" step="0.05" value="0.45">
   </div>
 
   <div class="card">
@@ -158,8 +158,8 @@ const data = [
   {
     name: "Unit 1: My Friend",
     q: [
-      ["How do you spell your name?", "It’s V – I."],
-      ["Where are you from?", "I’m from Can Tho."],
+      ["How do you spell your name?", "It is V I."],
+      ["Where are you from?", "I’m from Viet Nam."],
       ["Do your friends like dancing?", "Yes, they do."]
     ]
   },
@@ -167,7 +167,7 @@ const data = [
     name: "Unit 2: Family",
     q: [
       ["Who is this?", "This is my mother."],
-      ["What’s her name?", "Her name is Lan."],
+      ["What’s her name?", "Her name is Chi."],
       ["Do you have a pet?", "Yes, I do. I have a cat."]
     ]
   },
@@ -183,9 +183,9 @@ const data = [
   {
     name: "Unit 4: Home",
     q: [
-      ["Where’s your dad?", "He is in the living room."],
+      ["Where’s your dad?", "He is in the Bed room."],
       ["What’s he doing?", "He is watching TV."],
-      ["Who do you live with?", "I live with my mom and dad."],
+      ["Who do you live with?", "I live with mom and dad."],
       ["How many rooms are there?", "There are four rooms."]
     ]
   }
@@ -221,7 +221,7 @@ function handleSpeak(type) {
       
       utter.onend = () => {
         wordIdx++;
-        setTimeout(speakWord, 300); // Nghỉ 0.3s giữa các từ
+        setTimeout(speakWord, 150); // Nghỉ 0.15s giữa các từ
       };
       synth.speak(utter);
     }
@@ -267,3 +267,4 @@ render();
 
 </body>
 </html>
+
