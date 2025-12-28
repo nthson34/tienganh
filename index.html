@@ -67,6 +67,7 @@ select{
   display:flex;
   gap:10px;
   margin-top:14px;
+  flex-wrap:wrap;
 }
 .btn{
   flex:1;
@@ -76,6 +77,7 @@ select{
   font-size:15px;
 }
 .listen{background:#FFD93D;}
+.listenAnswer{background:#4FC3F7;color:white;}
 .show{background:#6BCB77;color:white;}
 .prev{background:#B0BEC5;}
 .next{background:#FF6B6B;color:white;}
@@ -86,7 +88,7 @@ select{
 
 <div class="container">
 <h1>🎈 English Speaking</h1>
-<div class="note">Giọng nữ – Anh Mỹ | Nghe → Bé nói → Xem đáp án</div>
+<div class="note">Giọng nữ châu Á – tự nhiên | Nghe → Bé nói → Nghe lại</div>
 
 <select id="unitSelect"></select>
 
@@ -94,8 +96,9 @@ select{
   <div class="question" id="question"></div>
 
   <div class="buttons">
-    <button class="btn listen" onclick="speak()">🔊 Nghe</button>
-    <button class="btn show" onclick="toggle()">👀 Đáp án</button>
+    <button class="btn listen" onclick="speakQuestion()">🔊 Nghe câu hỏi</button>
+    <button class="btn listenAnswer" onclick="speakAnswer()">🔊 Nghe đáp án</button>
+    <button class="btn show" onclick="toggle()">👀 Xem đáp án</button>
   </div>
 
   <div class="answer" id="answer"></div>
@@ -109,7 +112,7 @@ select{
 
 <script>
 // ==================
-// DATA – ĐÚNG BỘ CÂU HỎI CỦA BẠN
+// DATA – BỘ CÂU HỎI
 // ==================
 const data = [
 {
@@ -117,23 +120,23 @@ const data = [
   q:[
     ["How do you spell your name?","It’s V – I."],
     ["Where are you from?","I’m from Cần Thơ."],
-    ["Do your friends like dancing?","Yes, they do.\n(Có thể đổi: dancing → singing / reading)"]
+    ["Do your friends like dancing?","Yes, they do."]
   ]
 },
 {
   name:"Unit 2: Family",
   q:[
-    ["Who is this?","This is my mother.\n(Có thể đổi: father / grandfather / uncle)"],
-    ["What’s her name?","Her name is Lan.\n(Tên có thể đổi theo gia đình)"],
-    ["Do you have a pet?","Yes, I do. I have a cat.\nHoặc: No, I don’t."]
+    ["Who is this?","This is my mother."],
+    ["What’s her name?","Her name is Lan."],
+    ["Do you have a pet?","Yes, I do. I have a cat."]
   ]
 },
 {
   name:"Unit 3: School",
   q:[
-    ["Is this your book?","Yes, it is.\nHoặc: No, it isn’t."],
-    ["Are these your pens?","Yes, they are.\nHoặc: No, they aren’t."],
-    ["Do you like English?","Yes, I do.\nHoặc: No, I don’t."],
+    ["Is this your book?","Yes, it is."],
+    ["Are these your pens?","Yes, they are."],
+    ["Do you like English?","Yes, I do."],
     ["When do you have English?","I have English on Monday."]
   ]
 },
@@ -142,26 +145,35 @@ const data = [
   q:[
     ["Where’s your dad?","He is in the living room."],
     ["What’s he doing?","He is watching TV."],
-    ["Who do you live with?","I live with my mom and dad.\nHoặc: I live with my family."],
+    ["Who do you live with?","I live with my mom and dad."],
     ["How many rooms are there in your house?","There are four rooms."]
   ]
 }
 ];
 
 // ==================
-// FEMALE VOICE LOGIC
+// GIỌNG NỮ CHÂU Á – ƯU TIÊN
 // ==================
-let voices = [];
-let femaleVoice = null;
+let voices=[], selectedVoice=null;
 
 function loadVoices(){
   voices = speechSynthesis.getVoices();
-  femaleVoice = voices.find(v =>
-    v.lang === "en-US" &&
-    (v.name.toLowerCase().includes("female") ||
-     v.name.toLowerCase().includes("samantha") ||
-     v.name.toLowerCase().includes("zira"))
-  ) || voices.find(v => v.lang === "en-US");
+
+  // Ưu tiên giọng nữ châu Á
+  const priority = [
+    v => v.lang.startsWith("en-SG"),
+    v => v.lang.startsWith("en-IN"),
+    v => v.lang.startsWith("en-HK"),
+    v => v.lang.startsWith("en-JP"),
+    v => v.lang.startsWith("en-US")
+  ];
+
+  for(const rule of priority){
+    selectedVoice = voices.find(v =>
+      rule(v) && !v.name.toLowerCase().includes("male")
+    );
+    if(selectedVoice) break;
+  }
 }
 
 speechSynthesis.onvoiceschanged = loadVoices;
@@ -169,43 +181,42 @@ speechSynthesis.onvoiceschanged = loadVoices;
 // ==================
 // APP LOGIC
 // ==================
-let u = 0, i = 0;
-const unitSelect = document.getElementById("unitSelect");
-const questionEl = document.getElementById("question");
-const answerEl = document.getElementById("answer");
+let u=0,i=0;
+const unitSelect=document.getElementById("unitSelect");
+const questionEl=document.getElementById("question");
+const answerEl=document.getElementById("answer");
 
 data.forEach((unit,idx)=>{
-  unitSelect.innerHTML += `<option value="${idx}">${unit.name}</option>`;
+  unitSelect.innerHTML+=`<option value="${idx}">${unit.name}</option>`;
 });
 
-unitSelect.onchange = ()=>{
-  u = unitSelect.value;
-  i = 0;
-  render();
-};
+unitSelect.onchange=()=>{u=unitSelect.value;i=0;render();};
 
 function render(){
-  questionEl.textContent = "🔊 " + data[u].q[i][0];
-  answerEl.textContent = data[u].q[i][1];
-  answerEl.style.display = "none";
+  questionEl.textContent="🔊 "+data[u].q[i][0];
+  answerEl.textContent=data[u].q[i][1];
+  answerEl.style.display="none";
 }
 
-function next(){ if(i < data[u].q.length-1) i++; render(); }
-function prev(){ if(i > 0) i--; render(); }
+function speakText(text){
+  speechSynthesis.cancel();
+  const s=new SpeechSynthesisUtterance(text);
+  s.lang="en";
+  s.rate=0.8;
+  s.pitch=1;
+  if(selectedVoice) s.voice=selectedVoice;
+  speechSynthesis.speak(s);
+}
+
+function speakQuestion(){ speakText(data[u].q[i][0]); }
+function speakAnswer(){ speakText(data[u].q[i][1]); }
 
 function toggle(){
   answerEl.style.display =
     answerEl.style.display==="block" ? "none" : "block";
 }
-
-function speak(){
-  speechSynthesis.cancel();
-  const s = new SpeechSynthesisUtterance(data[u].q[i][0]);
-  s.lang = "en-US";
-  s.rate = 0.8;
-  if(femaleVoice) s.voice = femaleVoice;
-  speechSynthesis.speak(s);
-}
+function next(){ if(i<data[u].q.length-1)i++; render(); }
+function prev(){ if(i>0)i--; render(); }
 
 render();
 </script>
