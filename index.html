@@ -37,7 +37,7 @@ h1{
   text-align:center;
   font-size:16px;
   color:#555;
-  margin-bottom:10px;
+  margin-bottom:8px;
 }
 select{
   width:100%;
@@ -45,6 +45,28 @@ select{
   border-radius:14px;
   font-size:18px;
   margin:12px 0;
+}
+.speed-box{
+  margin:10px 0 16px;
+  padding:12px;
+  border-radius:16px;
+  background:#F1FDFB;
+  border:2px dashed var(--secondary);
+}
+.speed-label{
+  font-size:16px;
+  font-weight:800;
+  margin-bottom:6px;
+  text-align:center;
+}
+.speed-value{
+  text-align:center;
+  font-size:15px;
+  color:#333;
+  margin-top:4px;
+}
+input[type=range]{
+  width:100%;
 }
 .card{
   margin-top:16px;
@@ -94,9 +116,16 @@ select{
 
 <div class="container">
 <h1>🎈 English Speaking</h1>
-<div class="note">Nghe từng chữ → Bé nhắc lại → Nghe lại</div>
+<div class="note">Nghe từng chữ – chỉnh tốc độ cho bé</div>
 
 <select id="unitSelect"></select>
+
+<!-- THANH CHỈNH TỐC ĐỘ -->
+<div class="speed-box">
+  <div class="speed-label">🎚️ Tốc độ đọc</div>
+  <input type="range" id="speed" min="0.35" max="0.65" step="0.05" value="0.45">
+  <div class="speed-value" id="speedText">Chậm (0.45)</div>
+</div>
 
 <div class="card">
   <div class="question" id="question"></div>
@@ -124,8 +153,8 @@ const data = [
 {
   name:"Unit 1: My Friend",
   q:[
-    ["How do you spell your name?","It’s V – I."],
-    ["Where are you from?","I’m from Cần Thơ."],
+    ["How do you spell your name?","It’s V I."],
+    ["Where are you from?","I’m from Viet Nam."],
     ["Do your friends like dancing?","Yes, they do."]
   ]
 },
@@ -149,18 +178,28 @@ const data = [
 {
   name:"Unit 4: Home",
   q:[
-    ["Where’s your dad?","He is in the living room."],
+    ["Where’s your dad?","He is in the bed room."],
     ["What’s he doing?","He is watching TV."],
-    ["Who do you live with?","I live with my mom and dad."],
+    ["Who do you live with?","I live with mom dad."],
     ["How many rooms are there in your house?","There are four rooms."]
   ]
 }
 ];
 
 // ==================
-// GIỌNG + ĐỌC TỪNG CHỮ
+// GIỌNG + TỐC ĐỘ
 // ==================
 let voices=[], selectedVoice=null;
+let speed = 0.45;
+
+const speedSlider = document.getElementById("speed");
+const speedText = document.getElementById("speedText");
+
+speedSlider.oninput = ()=>{
+  speed = parseFloat(speedSlider.value);
+  let label = speed < 0.4 ? "Rất chậm" : speed < 0.55 ? "Chậm" : "Bình thường";
+  speedText.textContent = `${label} (${speed})`;
+};
 
 function loadVoices(){
   voices = speechSynthesis.getVoices();
@@ -183,13 +222,13 @@ function speakSlowWords(text){
 
     const u = new SpeechSynthesisUtterance(words[index]);
     u.lang = "en";
-    u.rate = 0.45;   // 🔥 RẤT CHẬM
-    u.pitch = 0.9;   // 🔥 KHÔNG LUYẾN
+    u.rate = speed;
+    u.pitch = 0.9;
     if(selectedVoice) u.voice = selectedVoice;
 
     u.onend = () => {
       index++;
-      setTimeout(speakNext, 450); // 🔥 NGẮT GIỮA CÁC TỪ
+      setTimeout(speakNext, 450);
     };
     speechSynthesis.speak(u);
   }
