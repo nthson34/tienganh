@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>English Speaking Practice</title>
+
+<style>
+:root{
+  --primary:#FF6B6B;
+  --secondary:#4ECDC4;
+  --bg:#F7FFF7;
+}
+body{
+  margin:0;
+  padding:16px;
+  font-family:'Comic Sans MS', cursive, sans-serif;
+  background:var(--bg);
+}
+.container{
+  max-width:520px;
+  margin:auto;
+  background:#fff;
+  border-radius:26px;
+  padding:18px;
+  border:4px solid var(--secondary);
+  box-shadow:0 12px 30px rgba(0,0,0,.12);
+}
+h1{
+  text-align:center;
+  color:var(--primary);
+}
+.note{
+  text-align:center;
+  font-size:14px;
+  color:#666;
+  margin-bottom:8px;
+}
+select{
+  width:100%;
+  padding:10px;
+  border-radius:12px;
+  font-size:16px;
+  margin:10px 0;
+}
+.card{
+  margin-top:14px;
+  padding:18px;
+  border-radius:20px;
+  border:2px solid #eee;
+}
+.question{
+  font-size:18px;
+  font-weight:bold;
+}
+.answer{
+  display:none;
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px dashed #ccc;
+  color:#2E7D32;
+  font-style:italic;
+  line-height:1.5;
+  white-space:pre-line;
+}
+.buttons,.nav{
+  display:flex;
+  gap:10px;
+  margin-top:14px;
+}
+.btn{
+  flex:1;
+  border:none;
+  padding:12px;
+  border-radius:14px;
+  font-size:15px;
+}
+.listen{background:#FFD93D;}
+.show{background:#6BCB77;color:white;}
+.prev{background:#B0BEC5;}
+.next{background:#FF6B6B;color:white;}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h1>🎈 English Speaking</h1>
+<div class="note">Giọng nữ – Anh Mỹ | Nghe → Bé nói → Xem đáp án</div>
+
+<select id="unitSelect"></select>
+
+<div class="card">
+  <div class="question" id="question"></div>
+
+  <div class="buttons">
+    <button class="btn listen" onclick="speak()">🔊 Nghe</button>
+    <button class="btn show" onclick="toggle()">👀 Đáp án</button>
+  </div>
+
+  <div class="answer" id="answer"></div>
+</div>
+
+<div class="nav">
+  <button class="btn prev" onclick="prev()">⬅️ Trước</button>
+  <button class="btn next" onclick="next()">➡️ Tiếp</button>
+</div>
+</div>
+
+<script>
+// ==================
+// DATA – ĐÚNG BỘ CÂU HỎI CỦA BẠN
+// ==================
+const data = [
+{
+  name:"Unit 1: My Friend",
+  q:[
+    ["How do you spell your name?","It’s V – I."],
+    ["Where are you from?","I’m from Cần Thơ."],
+    ["Do your friends like dancing?","Yes, they do.\n(Có thể đổi: dancing → singing / reading)"]
+  ]
+},
+{
+  name:"Unit 2: Family",
+  q:[
+    ["Who is this?","This is my mother.\n(Có thể đổi: father / grandfather / uncle)"],
+    ["What’s her name?","Her name is Lan.\n(Tên có thể đổi theo gia đình)"],
+    ["Do you have a pet?","Yes, I do. I have a cat.\nHoặc: No, I don’t."]
+  ]
+},
+{
+  name:"Unit 3: School",
+  q:[
+    ["Is this your book?","Yes, it is.\nHoặc: No, it isn’t."],
+    ["Are these your pens?","Yes, they are.\nHoặc: No, they aren’t."],
+    ["Do you like English?","Yes, I do.\nHoặc: No, I don’t."],
+    ["When do you have English?","I have English on Monday."]
+  ]
+},
+{
+  name:"Unit 4: Home",
+  q:[
+    ["Where’s your dad?","He is in the living room."],
+    ["What’s he doing?","He is watching TV."],
+    ["Who do you live with?","I live with my mom and dad.\nHoặc: I live with my family."],
+    ["How many rooms are there in your house?","There are four rooms."]
+  ]
+}
+];
+
+// ==================
+// FEMALE VOICE LOGIC
+// ==================
+let voices = [];
+let femaleVoice = null;
+
+function loadVoices(){
+  voices = speechSynthesis.getVoices();
+  femaleVoice = voices.find(v =>
+    v.lang === "en-US" &&
+    (v.name.toLowerCase().includes("female") ||
+     v.name.toLowerCase().includes("samantha") ||
+     v.name.toLowerCase().includes("zira"))
+  ) || voices.find(v => v.lang === "en-US");
+}
+
+speechSynthesis.onvoiceschanged = loadVoices;
+
+// ==================
+// APP LOGIC
+// ==================
+let u = 0, i = 0;
+const unitSelect = document.getElementById("unitSelect");
+const questionEl = document.getElementById("question");
+const answerEl = document.getElementById("answer");
+
+data.forEach((unit,idx)=>{
+  unitSelect.innerHTML += `<option value="${idx}">${unit.name}</option>`;
+});
+
+unitSelect.onchange = ()=>{
+  u = unitSelect.value;
+  i = 0;
+  render();
+};
+
+function render(){
+  questionEl.textContent = "🔊 " + data[u].q[i][0];
+  answerEl.textContent = data[u].q[i][1];
+  answerEl.style.display = "none";
+}
+
+function next(){ if(i < data[u].q.length-1) i++; render(); }
+function prev(){ if(i > 0) i--; render(); }
+
+function toggle(){
+  answerEl.style.display =
+    answerEl.style.display==="block" ? "none" : "block";
+}
+
+function speak(){
+  speechSynthesis.cancel();
+  const s = new SpeechSynthesisUtterance(data[u].q[i][0]);
+  s.lang = "en-US";
+  s.rate = 0.8;
+  if(femaleVoice) s.voice = femaleVoice;
+  speechSynthesis.speak(s);
+}
+
+render();
+</script>
+
+</body>
+</html>
