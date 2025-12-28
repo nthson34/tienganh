@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>English Speaking Practice</title>
+<title>English Speaking for Kids</title>
 
+<!-- FONT DỄ ĐỌC CHO TRẺ -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap" rel="stylesheet">
 
 <style>
@@ -56,18 +57,15 @@ select{
 .speed-label{
   font-size:16px;
   font-weight:800;
-  margin-bottom:6px;
   text-align:center;
 }
 .speed-value{
   text-align:center;
   font-size:15px;
-  color:#333;
   margin-top:4px;
 }
-input[type=range]{
-  width:100%;
-}
+input[type=range]{ width:100%; }
+
 .card{
   margin-top:16px;
   padding:20px;
@@ -116,7 +114,7 @@ input[type=range]{
 
 <div class="container">
 <h1>🎈 English Speaking</h1>
-<div class="note">Nghe từng chữ – chỉnh tốc độ cho bé</div>
+<div class="note">Nghe từng chữ – phát âm đúng</div>
 
 <select id="unitSelect"></select>
 
@@ -147,13 +145,13 @@ input[type=range]{
 
 <script>
 // ==================
-// DATA (GIỮ NGUYÊN)
+// DỮ LIỆU – ĐÚNG BỘ CÂU HỎI CỦA BẠN
 // ==================
 const data = [
 {
   name:"Unit 1: My Friend",
   q:[
-    ["How do you spell your name?","It’s V I."],
+    ["How do you spell your name?","It’s V – I."],
     ["Where are you from?","I’m from Viet Nam."],
     ["Do your friends like dancing?","Yes, they do."]
   ]
@@ -162,7 +160,7 @@ const data = [
   name:"Unit 2: Family",
   q:[
     ["Who is this?","This is my mother."],
-    ["What’s her name?","Her name is Lan."],
+    ["What’s her name?","Her name is Chi."],
     ["Do you have a pet?","Yes, I do. I have a cat."]
   ]
 },
@@ -178,13 +176,25 @@ const data = [
 {
   name:"Unit 4: Home",
   q:[
-    ["Where’s your dad?","He is in the bed room."],
+    ["Where’s your dad?","He is in the bedroom."],
     ["What’s he doing?","He is watching TV."],
-    ["Who do you live with?","I live with mom dad."],
-    ["How many rooms are there in your house?","There are four rooms."]
+    ["Who do you live with?","I live with mom and dad."],
+    ["How many rooms are there in your house?","There are tow rooms."]
   ]
 }
 ];
+
+// ==================
+// LÀM SẠCH CÂU – BỎ DẤU CÂU
+// ==================
+function cleanText(text){
+  return text
+    .replace(/[.,?!’'"]/g,"")
+    .replace(/–|-/g," ")
+    .replace(/\(|\)/g,"")
+    .replace(/\s+/g," ")
+    .trim();
+}
 
 // ==================
 // GIỌNG + TỐC ĐỘ
@@ -192,44 +202,42 @@ const data = [
 let voices=[], selectedVoice=null;
 let speed = 0.45;
 
-const speedSlider = document.getElementById("speed");
-const speedText = document.getElementById("speedText");
+const speedSlider=document.getElementById("speed");
+const speedText=document.getElementById("speedText");
 
-speedSlider.oninput = ()=>{
-  speed = parseFloat(speedSlider.value);
-  let label = speed < 0.4 ? "Rất chậm" : speed < 0.55 ? "Chậm" : "Bình thường";
+speedSlider.oninput=()=>{
+  speed=parseFloat(speedSlider.value);
+  let label = speed<0.4 ? "Rất chậm" : speed<0.55 ? "Chậm" : "Bình thường";
   speedText.textContent = `${label} (${speed})`;
 };
 
 function loadVoices(){
   voices = speechSynthesis.getVoices();
   selectedVoice =
-    voices.find(v => v.lang.startsWith("en-SG")) ||
-    voices.find(v => v.lang.startsWith("en-IN")) ||
-    voices.find(v => v.lang.startsWith("en-US")) ||
+    voices.find(v=>v.lang.startsWith("en-SG")) ||
+    voices.find(v=>v.lang.startsWith("en-IN")) ||
+    voices.find(v=>v.lang.startsWith("en-US")) ||
     voices[0];
 }
 speechSynthesis.onvoiceschanged = loadVoices;
 
-// ĐỌC TỪNG TỪ – CÓ NGẮT
-function speakSlowWords(text){
+// ==================
+// ĐỌC RÕ TỪNG TỪ – KHÔNG NHẤN NHÁ
+// ==================
+function speakClearWords(text){
   speechSynthesis.cancel();
-  const words = text.split(" ");
-  let index = 0;
+  const clean = cleanText(text);
+  const words = clean.split(" ");
+  let index=0;
 
   function speakNext(){
-    if(index >= words.length) return;
-
-    const u = new SpeechSynthesisUtterance(words[index]);
-    u.lang = "en";
-    u.rate = speed;
-    u.pitch = 0.9;
-    if(selectedVoice) u.voice = selectedVoice;
-
-    u.onend = () => {
-      index++;
-      setTimeout(speakNext, 450);
-    };
+    if(index>=words.length) return;
+    const u=new SpeechSynthesisUtterance(words[index]);
+    u.lang="en";
+    u.rate=speed;
+    u.pitch=1.0;
+    if(selectedVoice) u.voice=selectedVoice;
+    u.onend=()=>{ index++; setTimeout(speakNext,350); };
     speechSynthesis.speak(u);
   }
   speakNext();
@@ -255,12 +263,11 @@ function render(){
   answerEl.style.display="none";
 }
 
-function speakQuestion(){ speakSlowWords(data[u].q[i][0]); }
-function speakAnswer(){ speakSlowWords(data[u].q[i][1]); }
+function speakQuestion(){ speakClearWords(data[u].q[i][0]); }
+function speakAnswer(){ speakClearWords(data[u].q[i][1]); }
 
 function toggle(){
-  answerEl.style.display =
-    answerEl.style.display==="block" ? "none" : "block";
+  answerEl.style.display = answerEl.style.display==="block"?"none":"block";
 }
 function next(){ if(i<data[u].q.length-1)i++; render(); }
 function prev(){ if(i>0)i--; render(); }
